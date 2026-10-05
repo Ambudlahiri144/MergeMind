@@ -28,3 +28,10 @@ Thumbs.db
 .claude/settings.local.json
 # .claude/skills holds Windows junctions to .agents/skills (recreate with `npx skills add`)
 .claude/skills/
+
+# Agent/working docs: kept locally only, never published
+/AGENTS.md
+/CLAUDE.md
+/Decisions.md
+/memory.md
+/rules.md
