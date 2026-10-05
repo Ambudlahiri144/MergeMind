@@ -16,12 +16,12 @@
 | **Phase** | 3: Review pipeline (PRD F3, F4, F7, F8, F9) **complete, including M6 Langfuse tracing**. Verified with fakes, real Groq, a live GitHub App review (PR #1, now closed), and Langfuse ingestion. Phase 4 not started. |
 | **Code** | **worker:** full `review.pr` pipeline (`apps/worker/src/pipeline/`), registered only when the GitHub App env is set. **llm:** Groq → Gemini → Ollama chain, breaker, 3 prompts (`@1`), `llm:smoke`. **github:** Octokit App client, diff parser, anchoring, markdown, MSW fake. **shared:** policy, gate, fingerprint, budget, findings schema. **db:** reviewRuns, findings, suppressions, usageLedger. |
 | **Tests** | 222 unit/contract, 46 integration (incl. 14 end-to-end pipeline tests with crash recovery). Lint, typecheck, format and build are green. |
-| **Git** | `main`, **no commits yet**; Phases 1-3 are untracked, waiting for the human. |
+| **Git** | `main` pushed to the **public** repo https://github.com/Ambudlahiri144/MergeMind (remote `origin`). Phases 1-3 are in commit `395b22b`, on top of GitHub's `Initial commit` (MIT LICENSE). |
 | **Last session** | 2026-10-06 (cross-pass merge + Langfuse) |
-| **Next action** | **Human:** commit; delete the `mergemind-test` branch on `dev_portfolio`. **Agent:** plan Phase 4 (incremental review + code index) in plan mode. |
+| **Next action** | **Human:** delete the `mergemind-test` branch on `dev_portfolio`. **Agent:** plan Phase 4 (incremental review + code index) in plan mode. |
 
 ## Next steps
-1. **Human:** review and commit. Suggested split: `chore: scaffold monorepo (phase 1)`, `feat(api): webhook ingestion (phase 2)`, `feat(worker): review pipeline (phase 3)`.
+1. **Repo is public:** never commit `.env` or keys. Run the secret scan (see the 2026-10-06 push log) before each push. A README is due in Phase 7, or earlier if wanted.
 2. **Phase 4:** incremental review (compare `lastReviewedSha...headSha`, resolve fixed findings) and the code index (F5, F6). `retrieveContext` is a no-op in `run-review.ts` and `push` is still ignored. Atlas M0 needs the `code_chunks_vector` search index (create it through the Atlas UI or API).
 3. **Phase 5:** CI failure summary (F10).
 4. **Phase 6:** web UI (F11) plus the dismiss-finding endpoint (creates suppressions via `suppressions.suppress`) and manual rerun (`attempt` 2, job id `-a2`). Set `AUTH_SECRET` then.
@@ -74,6 +74,15 @@
 ---
 
 ## Session log (newest first)
+
+### 2026-10-06: first push to the public repo
+- **Remote:** `origin` = https://github.com/Ambudlahiri144/MergeMind (public). Its `main` held only `Initial commit` (MIT LICENSE, Ambud Lahiri). The local work was based on it (`git reset origin/main`), committed as `395b22b` (197 files), and pushed as a fast-forward with no force.
+- **Pre-push checks:**
+  - No `.env`, `.pem`, `dist/` or `node_modules` files are tracked.
+  - A regex scan found no API keys (Groq/Gemini/Langfuse/GitHub), PEM blocks, connection strings, IPs or emails.
+  - The fake `sk_live_` test key exists only in chat, not in the repo.
+- **Licensing:** the third-party skills (Leonxlnx/taste-skill, MIT) are now shipped with their license (`.agents/skills/LICENSE`, `.agents/skills/README.md`).
+- **Git identity:** commits are authored as `Ambud Lahiri <ambudlahiri123@gmail.com>` (local git config). Credentials come from Git Credential Manager (`manager-core`).
 
 ### 2026-10-06: close PR #1, cross-pass merge, Langfuse (Phase 3 M6)
 - **Closed** PR #1 on `dev_portfolio` via the App (`state: closed`, not merged). MergeMind processed the close (`handled/pr_closed`). The branch `mergemind-test` still exists.
