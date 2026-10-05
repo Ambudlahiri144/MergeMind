@@ -1,0 +1,53 @@
+{
+  "action": "suspend",
+  "installation": {
+    "id": 55500001,
+    "node_id": "MDIzOkludGVncmF0aW9uSW5zdGFsbGF0aW9uNTU1MDAwMDE=",
+    "account": {
+      "login": "octo-demo",
+      "id": 9100001,
+      "node_id": "O_kgDOAAAAAA",
+      "type": "Organization",
+      "site_admin": false
+    },
+    "repository_selection": "selected",
+    "app_id": 1000001,
+    "app_slug": "mergemind-review",
+    "target_id": 9100001,
+    "target_type": "Organization",
+    "permissions": {
+      "checks": "write",
+      "contents": "read",
+      "metadata": "read",
+      "pull_requests": "write",
+      "actions": "read"
+    },
+    "events": ["pull_request", "push", "workflow_run"],
+    "created_at": "2026-10-01T09:00:00.000Z",
+    "updated_at": "2026-10-01T09:00:00.000Z",
+    "suspended_at": "2026-10-03T12:00:00Z"
+  },
+  "repositories": [
+    {
+      "id": 77700001,
+      "node_id": "R_kgDOAAAAAC",
+      "name": "payments-api",
+      "full_name": "octo-demo/payments-api",
+      "private": true
+    },
+    {
+      "id": 77700002,
+      "node_id": "R_kgDOAAAAAD",
+      "name": "web-console",
+      "full_name": "octo-demo/web-console",
+      "private": false
+    }
+  ],
+  "sender": {
+    "login": "dev-alice",
+    "id": 9200001,
+    "node_id": "U_kgDOAAAAAB",
+    "type": "User",
+    "site_admin": false
+  }
+}

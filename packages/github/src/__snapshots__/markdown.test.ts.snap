@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderInlineComment > renders severity, title, body, a fenced fix and the fingerprint marker 1`] = `
+"**Critical:** SQL injection in findUser
+
+User-controlled \`id\` is concatenated into the query.
+
+**Suggested fix**
+
+\`\`\`
+db.query("SELECT * FROM users WHERE id = $1", [id]);
+\`\`\`
+
+<!-- mergemind:fp=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff -->"
+`;
+
+exports[`renderReviewBody > renders counts, notes, grouped body findings and the run marker 1`] = `
+"### MergeMind review
+
+**1 critical** · **1 major** · 1 minor
+
+1 inline comment below.
+
+#### Notes
+
+- Invalid .mergemind.yml (defaults applied): gate.failOn: Invalid option
+
+#### Outside the changed lines
+
+- **Major** \`src/users.ts:L90\` Unbounded query: User-controlled \`id\` is concatenated into the query.
+
+#### Nits
+
+- **Minor** \`src/users.ts:L11-L12\` Prefer const: User-controlled \`id\` is concatenated into the query.
+
+<sub>Reviewed \`a1b2c3d\` · 3 below the confidence threshold · 2 suppressed · 1 already reported</sub>
+
+<!-- mergemind:run=66f0a1b2c3d4e5f601234567 -->"
+`;

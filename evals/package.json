@@ -1,0 +1,13 @@
+{
+  "name": "@mergemind/evals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "tsx --conditions=@mergemind/source --env-file-if-exists=../.env src/run-evals.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mergemind/shared": "^0.0.0"
+  }
+}

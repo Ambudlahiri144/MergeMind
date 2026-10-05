@@ -1,0 +1,38 @@
+# Local infrastructure (Architecture.md §7). Start with: docker compose up -d
+# Host ports default to 27017/6379. Override with MONGO_HOST_PORT / REDIS_HOST_PORT in .env
+# (compose reads it) if another project already uses them, and update MONGODB_URI / REDIS_URL to match.
+name: mergemind
+
+services:
+  mongo:
+    # MongoDB with Atlas Search + Vector Search, identical $vectorSearch behavior to Atlas M0 (ADR-004).
+    image: mongodb/mongodb-atlas-local:8.0
+    hostname: mongo
+    ports:
+      - '${MONGO_HOST_PORT:-27017}:27017'
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+      - mongot-data:/data/mongot
+    restart: unless-stopped
+
+  redis:
+    # BullMQ requires noeviction so queued jobs are never dropped (ADR-005).
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    ports:
+      - '${REDIS_HOST_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  mongo-config:
+  mongot-data:
+  redis-data:

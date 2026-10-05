@@ -1,0 +1,36 @@
+{
+  "name": "@mergemind/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "@mergemind/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./logger": {
+      "@mergemind/source": "./src/logger.ts",
+      "types": "./dist/logger.d.ts",
+      "default": "./dist/logger.js"
+    },
+    "./testing": {
+      "@mergemind/source": "./src/testing/index.ts",
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "picomatch": "^4.0.7",
+    "pino": "^10.4.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/picomatch": "^4.0.3"
+  }
+}

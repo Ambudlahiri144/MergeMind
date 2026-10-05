@@ -1,0 +1,6 @@
+version: 1
+review:
+  minConfidence: 1.5
+  passes: [security, style]
+gate:
+  failOn: sometimes

@@ -1,0 +1,13 @@
+version: 1
+review:
+  enabled: true
+  passes: [security, correctness]
+  minConfidence: 0.8
+  maxChangedLines: 800
+  skipDrafts: false
+  ignorePaths: ['docs/**', '**/*.generated.ts']
+gate:
+  failOn: major
+ciSummary:
+  enabled: false
+persona: 'Strict payments reviewer. Flag money-handling bugs first.'

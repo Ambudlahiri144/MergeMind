@@ -1,0 +1,22 @@
+{
+  "name": "@mergemind/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --conditions=@mergemind/source --env-file-if-exists=../../.env src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --env-file-if-exists=../../.env dist/main.js",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mergemind/db": "^0.0.0",
+    "@mergemind/github": "^0.0.0",
+    "@mergemind/llm": "^0.0.0",
+    "@mergemind/shared": "^0.0.0",
+    "bullmq": "^6.3.11",
+    "ioredis": "^6.0.0",
+    "p-limit": "^7.3.3",
+    "zod": "^4.6.5"
+  }
+}

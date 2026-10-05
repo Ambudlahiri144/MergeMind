@@ -1,0 +1,3 @@
+review:
+  passes: [security, correctness
+  minConfidence: 0.8

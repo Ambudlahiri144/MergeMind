@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.next/
+coverage/
+evals/reports/
+.agents/
+.claude/
+package-lock.json
+# Hand-written docs keep their own table formatting.
+*.md
+# Policy fixtures include deliberately invalid YAML.
+packages/shared/test/fixtures/policy/
