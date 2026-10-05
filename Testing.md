@@ -1,7 +1,5 @@
 # MergeMind: Testing Strategy
 
-> What we test, with which tools, where tests live, and how to write them. Commands match [AGENTS.md](AGENTS.md).
-
 ---
 
 ## 1. Test pyramid and scope
@@ -45,8 +43,6 @@
 | Browser E2E | **Playwright** | Chromium in CI, all 3 engines locally on demand |
 | Accessibility | `@axe-core/playwright` | Zero serious/critical violations |
 | Load | autocannon | Replays signed webhook payloads |
-
-**Why not Jest:** see ADR-012 in [Decisions.md](Decisions.md).
 
 ---
 

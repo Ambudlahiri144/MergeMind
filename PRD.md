@@ -6,7 +6,7 @@
 | **Status** | Pre-build (docs phase) |
 | **Owner** | Ambud Lahiri |
 | **Last updated** | 2026-10-06 |
-| **Related docs** | [Architecture.md](Architecture.md), [Decisions.md](Decisions.md), [Testing.md](Testing.md), [Design.md](Design.md), [rules.md](rules.md) |
+| **Related docs** | [Architecture.md](Architecture.md), [Testing.md](Testing.md), [Design.md](Design.md) |
 
 ---
 
@@ -104,8 +104,6 @@ When CI fails, engineers scroll through thousands of log lines to find the one t
 | Auth (web) | Auth.js with the GitHub provider |
 | Testing | Vitest, Supertest, Testcontainers, MSW, Playwright, custom eval runner |
 | Local infra | Docker Compose (atlas-local, Redis), smee.io webhook proxy |
-
-Every choice has an ADR in [Decisions.md](Decisions.md).
 
 ---
 
