@@ -62,7 +62,7 @@ When CI fails, engineers scroll through thousands of log lines to find the one t
 | F7 | **`.mergemind.yml` policy** | A per-repo policy file controls passes, minimum confidence, ignored paths, the gate, the size limit, skipping drafts, and persona. It is read at the PR's `headSha`; if missing or invalid, safe defaults apply and the invalid file is reported in the summary. |
 | F8 | **Confidence filter + suppressions** | Findings below `minConfidence` (default 0.7) are dropped. A developer can dismiss a finding, which creates a suppression (by fingerprint) for that repo. |
 | F9 | **Per-org token budget** | Every LLM call is recorded in `usageLedger`. At 80% of the monthly budget, the run summary warns. At 100%, reviews are skipped with a `neutral` check explaining why. |
-| F10 | **CI failure summary** | A `workflow_run` event that completes with conclusion `failure` on a PR branch fetches the failed job logs, extracts the relevant window, and posts one summary comment citing log lines. |
+| F10 | **CI failure summary** | A `workflow_run` event that completes with conclusion `failure` (or `timed_out`) on a PR branch fetches the failed job logs, extracts the relevant window, and posts one summary comment citing log lines. There is one comment per PR per workflow, updated in place on re-runs and later failures, and marked "passing again" when the workflow succeeds. Private-repo logs follow the provider allowlist; without an allowed provider or budget, the comment shows the log excerpt only. |
 | F11 | **Thin web UI** | Next.js app with GitHub sign-in, repositories, PR detail with review runs, run detail with findings, and settings for policy view and budget. See [Design.md](Design.md). |
 
 ### Out of scope for MVP

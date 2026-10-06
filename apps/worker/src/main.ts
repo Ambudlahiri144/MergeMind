@@ -14,13 +14,16 @@ import {
 } from '@mergemind/db';
 import { createGithubApp, type GithubApp } from '@mergemind/github';
 import {
+  createCiSummaryLlm,
   createEmbedder,
   createLangfuseTracer,
   createProviderChain,
   createReviewLlm,
+  createStructuredCaller,
   noopTracer,
   type Embedder,
   type LlmTracer,
+  type StructuredCaller,
 } from '@mergemind/llm';
 import { QUEUE_NAMES, registerGracefulShutdown, type ShutdownStep } from '@mergemind/shared';
 import { createLogger, type Logger } from '@mergemind/shared/logger';
@@ -30,6 +33,7 @@ import type { Redis } from 'ioredis';
 import { loadWorkerEnv, type WorkerEnv } from './config/env.js';
 import { smokeTestGrammars } from './indexing/chunker/tree-sitter.js';
 import { DEFAULT_PIPELINE_CONFIG, type ReviewDeps } from './pipeline/types.js';
+import { createCiSummaryProcessor } from './processors/ci-summary.processor.js';
 import { createIndexProcessor } from './processors/index.processor.js';
 import { createReviewProcessor } from './processors/review.processor.js';
 import { createWorkerRedisConnection } from './queues/connection.js';
@@ -63,10 +67,11 @@ function createTracer(workerEnv: WorkerEnv, log: Logger): LlmTracer {
 
 const tracer = createTracer(env, logger);
 
-/** Built once and shared by the review and index workers. */
-type SharedServices = { github: GithubApp; embedder: Embedder };
+/** Built once and shared by every worker. */
+type SharedServices = { github: GithubApp; embedder: Embedder; llmCaller: StructuredCaller };
 
-function buildReviewDeps(workerEnv: WorkerEnv, shared: SharedServices, log: Logger): ReviewDeps {
+/** One provider chain and one circuit breaker for reviews and CI summaries (ADR-028). */
+function createLlmCaller(workerEnv: WorkerEnv, log: Logger): StructuredCaller {
   const providers = createProviderChain({
     ollamaBaseUrl: workerEnv.OLLAMA_BASE_URL,
     primaryModel: workerEnv.LLM_PRIMARY_MODEL,
@@ -84,6 +89,15 @@ function buildReviewDeps(workerEnv: WorkerEnv, shared: SharedServices, log: Logg
     { providers: providers.map((provider) => `${provider.name}:${provider.modelId}`) },
     'llm.chainConfigured',
   );
+  return createStructuredCaller({
+    providers,
+    timeoutMs: workerEnv.LLM_TIMEOUT_MS,
+    logger: log,
+    tracer,
+  });
+}
+
+function buildReviewDeps(workerEnv: WorkerEnv, shared: SharedServices, log: Logger): ReviewDeps {
   return {
     installations: createInstallationsRepository(),
     repositories: createRepositoriesRepository(),
@@ -95,7 +109,7 @@ function buildReviewDeps(workerEnv: WorkerEnv, shared: SharedServices, log: Logg
     codeChunks: createCodeChunksRepository(),
     embedder: shared.embedder,
     github: shared.github,
-    llm: createReviewLlm({ providers, timeoutMs: workerEnv.LLM_TIMEOUT_MS, logger: log, tracer }),
+    llm: createReviewLlm({ caller: shared.llmCaller }),
     logger: log,
     now: () => new Date(),
     config: {
@@ -158,6 +172,29 @@ async function startIndexWorker(connection: Redis, shared: SharedServices): Prom
   return worker;
 }
 
+function startCiSummaryWorker(connection: Redis, shared: SharedServices): Worker {
+  const worker = new Worker(
+    QUEUE_NAMES.ciSummary,
+    createCiSummaryProcessor({
+      installations: createInstallationsRepository(),
+      repositories: createRepositoriesRepository(),
+      usageLedger: createUsageLedgerRepository(),
+      github: shared.github,
+      llm: createCiSummaryLlm({ caller: shared.llmCaller }),
+      logger,
+      now: () => new Date(),
+    }),
+    { connection, concurrency: env.CI_SUMMARY_CONCURRENCY },
+  );
+  worker.on('failed', (job, error) => {
+    logger.error({ err: error, jobId: job?.id, attemptsMade: job?.attemptsMade }, 'ci.failed');
+  });
+  worker.on('error', (error) => {
+    logger.error({ err: error }, 'worker.error');
+  });
+  return worker;
+}
+
 async function main(): Promise<void> {
   await connectMongo(env.MONGODB_URI);
   await ensureDbIndexes();
@@ -179,14 +216,15 @@ async function main(): Promise<void> {
         logger,
       }),
       embedder: createEmbedder({ ollamaBaseUrl: env.OLLAMA_BASE_URL, model: env.EMBEDDING_MODEL }),
+      llmCaller: createLlmCaller(env, logger),
     };
     workers.push({ name: 'review-worker', worker: startReviewWorker(connection, shared) });
+    workers.push({ name: 'ci-summary-worker', worker: startCiSummaryWorker(connection, shared) });
     const indexWorker = await startIndexWorker(connection, shared);
     if (indexWorker !== null) {
       workers.push({ name: 'index-worker', worker: indexWorker });
     }
   }
-  // The `ci-summary` processor registers here in Phase 5.
   logger.info(
     {
       workers: workers.map(({ name }) => name),

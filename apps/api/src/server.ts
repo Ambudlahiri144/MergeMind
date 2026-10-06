@@ -14,6 +14,7 @@ import { Redis } from 'ioredis';
 
 import { createApp } from './app.js';
 import { loadApiEnv } from './config/env.js';
+import { createCiSummaryProducer } from './queues/ci-summary.producer.js';
 import { createIndexProducer } from './queues/index.producer.js';
 import { createReviewProducer } from './queues/review.producer.js';
 import { createWebhookService } from './services/webhook.service.js';
@@ -31,6 +32,7 @@ async function main(): Promise<void> {
 
   const reviewProducer = createReviewProducer({ connection: redis });
   const indexProducer = createIndexProducer({ connection: redis });
+  const ciSummaryProducer = createCiSummaryProducer({ connection: redis });
   const webhookService = createWebhookService({
     deliveries: createWebhookDeliveriesRepository(),
     installations: createInstallationsRepository(),
@@ -38,6 +40,7 @@ async function main(): Promise<void> {
     pullRequests: createPullRequestsRepository(),
     reviewProducer,
     indexProducer,
+    ciSummaryProducer,
   });
 
   const app = createApp({
@@ -78,6 +81,7 @@ async function main(): Promise<void> {
     },
     { name: 'review-queue', run: () => reviewProducer.close() },
     { name: 'index-queue', run: () => indexProducer.close() },
+    { name: 'ci-summary-queue', run: () => ciSummaryProducer.close() },
     {
       name: 'redis',
       run: async () => {

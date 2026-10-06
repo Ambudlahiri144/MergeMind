@@ -25,6 +25,7 @@ import {
 import type { Logger } from '@mergemind/shared/logger';
 import pLimit from 'p-limit';
 
+import { escalateVisibility } from '../repository-visibility.js';
 import { chunkFile, type FileChunk } from './chunker/chunk-file.js';
 import {
   looksMinified,
@@ -108,10 +109,11 @@ async function planChanges(
  */
 export async function runIndex(data: IndexRepoJobData, deps: IndexDeps): Promise<IndexOutcome> {
   const log = deps.logger.child({ repo: data.repoFullName, trigger: data.trigger });
-  const repository = await deps.repositories.findByGithubRepoId(data.githubRepoId);
-  if (!repository) {
+  const known = await deps.repositories.findByGithubRepoId(data.githubRepoId);
+  if (!known) {
     return { status: 'skipped', reason: 'unknown_repository' };
   }
+  let repository = await escalateVisibility(known, data.isPrivate, deps.repositories);
   if (!repository.isInstalled || !repository.isEnabled) {
     return { status: 'skipped', reason: 'repository_disabled' };
   }
@@ -131,8 +133,16 @@ export async function runIndex(data: IndexRepoJobData, deps: IndexDeps): Promise
   const client = await deps.github.forInstallation(data.githubInstallationId);
   let defaultBranch = data.defaultBranch ?? repository.defaultBranch;
   if (defaultBranch === undefined) {
-    defaultBranch = (await client.getRepositoryInfo(repoRef)).defaultBranch;
+    const info = await client.getRepositoryInfo(repoRef);
+    defaultBranch = info.defaultBranch;
     await deps.repositories.setDefaultBranch(repository.id, defaultBranch);
+    // A live read is authoritative both ways (ADR-027).
+    if (info.isPrivate !== repository.isPrivate) {
+      await deps.repositories.updateFromGithub(repository.githubRepoId, {
+        isPrivate: info.isPrivate,
+      });
+      repository = { ...repository, isPrivate: info.isPrivate };
+    }
   }
   const head = await client.getBranchHead({ ...repoRef, branch: defaultBranch });
   if (repository.lastIndexedSha === head.sha && repository.indexStatus === 'ready') {

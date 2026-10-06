@@ -6,7 +6,7 @@ import type { LlmTraceEvent, LlmTracer } from './tracer.js';
 
 const event: LlmTraceEvent = {
   runId: '66f0a1b2c3d4e5f601234567',
-  pass: 'security',
+  task: 'review.security',
   provider: 'groq',
   model: 'openai/gpt-oss-120b',
   promptVersion: 'security@1',

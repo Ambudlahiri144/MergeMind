@@ -1,6 +1,7 @@
 import {
   INSTALLATION_ACTIONS,
   INSTALLATION_REPOSITORIES_ACTIONS,
+  REPOSITORY_ACTIONS,
   type ReviewTrigger,
 } from '@mergemind/shared';
 
@@ -12,10 +13,7 @@ const REVIEW_TRIGGER_ACTIONS: ReadonlySet<string> = new Set<ReviewTrigger>([
   'ready_for_review',
 ]);
 
-/** Events in Architecture.md §5 that later phases handle (workflow_run → Phase 5). */
-const NOT_YET_SUPPORTED_EVENTS: ReadonlySet<string> = new Set(['workflow_run']);
-
-export type IgnoreReason = 'unsupported_event' | 'unsupported_action' | 'not_yet_supported';
+export type IgnoreReason = 'unsupported_event' | 'unsupported_action';
 
 export type WebhookRoute =
   | { kind: 'installation' }
@@ -23,6 +21,8 @@ export type WebhookRoute =
   | { kind: 'pull_request_review'; trigger: ReviewTrigger }
   | { kind: 'pull_request_closed' }
   | { kind: 'push' }
+  | { kind: 'repository' }
+  | { kind: 'workflow_run' }
   | { kind: 'ignored'; reason: IgnoreReason };
 
 function isOneOf(values: readonly string[], action: string | undefined): boolean {
@@ -50,10 +50,16 @@ export function routeWebhook(event: string, action: string | undefined): Webhook
     case 'push':
       // The handler keeps only default-branch pushes (it needs the payload to tell).
       return { kind: 'push' };
+    case 'repository':
+      return isOneOf(REPOSITORY_ACTIONS, action)
+        ? { kind: 'repository' }
+        : { kind: 'ignored', reason: 'unsupported_action' };
+    case 'workflow_run':
+      // The handler decides by conclusion and linked PRs (PRD F10).
+      return action === 'completed'
+        ? { kind: 'workflow_run' }
+        : { kind: 'ignored', reason: 'unsupported_action' };
     default:
-      return {
-        kind: 'ignored',
-        reason: NOT_YET_SUPPORTED_EVENTS.has(event) ? 'not_yet_supported' : 'unsupported_event',
-      };
+      return { kind: 'ignored', reason: 'unsupported_event' };
   }
 }

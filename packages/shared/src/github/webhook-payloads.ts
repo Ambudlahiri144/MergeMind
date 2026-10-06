@@ -91,3 +91,37 @@ export const PushEventSchema = z.object({
   }),
 });
 export type PushEvent = z.infer<typeof PushEventSchema>;
+
+export const REPOSITORY_ACTIONS = ['publicized', 'privatized', 'renamed'] as const;
+
+/** Visibility and name changes; the payload's `repository` holds the new state (ADR-027). */
+export const RepositoryEventSchema = z.object({
+  action: z.enum(REPOSITORY_ACTIONS),
+  installation: InstallationRefSchema,
+  repository: InstallationRepositorySchema,
+});
+export type RepositoryEvent = z.infer<typeof RepositoryEventSchema>;
+
+/** A finished GitHub Actions run (PRD F10). `pull_requests` is empty for fork PRs. */
+export const WorkflowRunEventSchema = z.object({
+  action: z.string(),
+  installation: InstallationRefSchema,
+  repository: InstallationRepositorySchema,
+  workflow_run: z.object({
+    id: GithubIdSchema,
+    name: z.string().nullish(),
+    workflow_id: GithubIdSchema,
+    run_number: z.number().int().positive(),
+    run_attempt: z.number().int().positive(),
+    head_sha: GitShaSchema,
+    head_branch: z.string().nullish(),
+    status: z.string(),
+    conclusion: z.string().nullish(),
+    html_url: z.url(),
+    head_repository: z.object({ id: GithubIdSchema }).nullish(),
+    pull_requests: z
+      .array(z.object({ number: GithubIdSchema, head: z.object({ sha: GitShaSchema }) }))
+      .nullish(),
+  }),
+});
+export type WorkflowRunEvent = z.infer<typeof WorkflowRunEventSchema>;

@@ -53,7 +53,7 @@ export function createLangfuseTracer(options: LangfuseTracerOptions): LlmTracer 
         const endTime = new Date();
         const startTime = new Date(endTime.getTime() - event.latencyMs);
         const generation = startObservation(
-          `review.${event.pass}`,
+          event.task,
           {
             model: event.model,
             version: event.promptVersion,
@@ -83,8 +83,8 @@ export function createLangfuseTracer(options: LangfuseTracerOptions): LlmTracer 
         // (propagateAttributes would need a global OTel context manager, which we don't install.)
         generation.otelSpan.setAttributes({
           [LangfuseOtelSpanAttributes.TRACE_SESSION_ID]: event.runId,
-          [LangfuseOtelSpanAttributes.TRACE_NAME]: `review.${event.pass}`,
-          [LangfuseOtelSpanAttributes.TRACE_TAGS]: ['review', event.pass, event.provider],
+          [LangfuseOtelSpanAttributes.TRACE_NAME]: event.task,
+          [LangfuseOtelSpanAttributes.TRACE_TAGS]: [...event.task.split('.'), event.provider],
         });
         generation.end(endTime);
       } catch (error) {

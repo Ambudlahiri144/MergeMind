@@ -1,10 +1,11 @@
-import type { LlmProviderName, ReviewPass } from '@mergemind/shared';
+import type { LlmProviderName } from '@mergemind/shared';
 
 export type LlmCallOutcome = 'ok' | 'invalid_output' | 'error';
 
 export type LlmTraceEvent = {
   runId: string;
-  pass: ReviewPass;
+  /** What the call was for: `review.<pass>` or `ci-summary`; becomes the Langfuse trace name. */
+  task: string;
   provider: LlmProviderName;
   model: string;
   promptVersion: string;

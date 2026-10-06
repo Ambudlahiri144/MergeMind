@@ -11,8 +11,10 @@ import {
 } from '@mergemind/db';
 import {
   QUEUE_NAMES,
+  buildCiSummaryJobId,
   buildIndexJobId,
   buildReviewJobId,
+  type CiSummaryJobData,
   type IndexRepoJobData,
 } from '@mergemind/shared';
 import { createLogger } from '@mergemind/shared/logger';
@@ -28,6 +30,10 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, inject } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import {
+  createCiSummaryProducer,
+  type CiSummaryProducer,
+} from '../../src/queues/ci-summary.producer.js';
 import { createIndexProducer, type IndexProducer } from '../../src/queues/index.producer.js';
 import { createReviewProducer, type ReviewProducer } from '../../src/queues/review.producer.js';
 import { createWebhookService } from '../../src/services/webhook.service.js';
@@ -47,6 +53,8 @@ let reviewProducer: ReviewProducer;
 let indexProducer: IndexProducer;
 let queue: Queue;
 let indexQueue: Queue<IndexRepoJobData>;
+let ciSummaryProducer: CiSummaryProducer;
+let ciQueue: Queue<CiSummaryJobData>;
 let app: ReturnType<typeof createApp>;
 
 beforeAll(async () => {
@@ -58,6 +66,8 @@ beforeAll(async () => {
   queue = new Queue(QUEUE_NAMES.review, { connection: redis, prefix });
   indexProducer = createIndexProducer({ connection: redis, prefix });
   indexQueue = new Queue(QUEUE_NAMES.index, { connection: redis, prefix });
+  ciSummaryProducer = createCiSummaryProducer({ connection: redis, prefix });
+  ciQueue = new Queue(QUEUE_NAMES.ciSummary, { connection: redis, prefix });
 
   app = createApp({
     logger: createLogger({ name: 'test', level: 'silent' }),
@@ -71,6 +81,7 @@ beforeAll(async () => {
         pullRequests,
         reviewProducer,
         indexProducer,
+        ciSummaryProducer,
       }),
     },
   });
@@ -79,8 +90,10 @@ beforeAll(async () => {
 afterAll(async () => {
   await queue.close();
   await indexQueue.close();
+  await ciQueue.close();
   await reviewProducer.close();
   await indexProducer.close();
+  await ciSummaryProducer.close();
   await redis.quit();
   await mongoose.connection.dropDatabase();
   await disconnectMongo();
@@ -348,5 +361,92 @@ describe('code index triggers (PRD F6)', () => {
       ),
     );
     expect(jobs.map((job) => job?.data.trigger)).toEqual(['installation', 'installation']);
+  });
+});
+
+describe('repository visibility (ADR-027)', () => {
+  it('makes a tracked repo public on repository.publicized', async () => {
+    await sendFixture('installation.created');
+
+    const { response } = await sendFixture('repository.publicized');
+
+    expect(response.body).toMatchObject({ status: 'handled', reason: 'repository_publicized' });
+    expect((await repositories.findByGithubRepoId(77700001))?.isPrivate).toBe(false);
+  });
+
+  it('follows a rename and a privatize', async () => {
+    await sendFixture('installation.created');
+
+    await sendFixture('repository.renamed');
+
+    expect(await repositories.findByGithubRepoId(77700001)).toMatchObject({
+      fullName: 'octo-demo/billing-api',
+      isPrivate: true,
+    });
+  });
+
+  it('ignores a repository it does not track', async () => {
+    const { response } = await sendFixture('repository.privatized', {
+      mutate: withRepoId(930001),
+    });
+
+    expect(response.body).toMatchObject({ status: 'ignored', reason: 'unknown_repository' });
+    expect(await repositories.findByGithubRepoId(930001)).toBeNull();
+  });
+});
+
+describe('CI failure summary triggers (PRD F10)', () => {
+  const RUN = { workflowRunId: 8800000001, runAttempt: 1 };
+
+  it('enqueues one ci-summary.run job for a failed run, even when redelivered', async () => {
+    const deliveryId = randomUUID();
+
+    const sends = [];
+    for (let i = 0; i < 3; i += 1) {
+      sends.push(
+        await sendFixture('workflow_run.completed-failure', {
+          deliveryId,
+          mutate: withRepoId(940001),
+        }),
+      );
+    }
+
+    expect(sends.map(({ response }) => response.status)).toEqual([202, 202, 202]);
+    expect(sends[0]?.response.body).toMatchObject({
+      status: 'enqueued',
+      reason: 'ci_summary_enqueued',
+    });
+    expect(
+      sends.slice(1).map(({ response }) => (response.body as { status: string }).status),
+    ).toEqual(['duplicate', 'duplicate']);
+    const jobs = await ciQueue.getWaiting();
+    const ids = jobs.map((job) => job.id).filter((id) => id?.startsWith('940001#'));
+    expect(ids).toEqual([buildCiSummaryJobId({ githubRepoId: 940001, ...RUN })]);
+    expect(jobs.find((job) => job.id === ids[0])?.data).toMatchObject({
+      outcome: 'failed',
+      prNumbers: [42],
+      workflowName: 'CI',
+    });
+  });
+
+  it('enqueues a passed job for a successful run linked to a PR', async () => {
+    await sendFixture('workflow_run.completed-success', { mutate: withRepoId(940002) });
+
+    const job = await ciQueue.getJob(buildCiSummaryJobId({ githubRepoId: 940002, ...RUN }));
+    expect(job?.data.outcome).toBe('passed');
+  });
+
+  it('ignores a cancelled run', async () => {
+    const { response } = await sendFixture('workflow_run.completed-failure', {
+      mutate: (payload) => {
+        withRepoId(940003)(payload);
+        (payload.workflow_run as { conclusion: string }).conclusion = 'cancelled';
+      },
+    });
+
+    expect(response.body).toMatchObject({ status: 'ignored', reason: 'conclusion_cancelled' });
+    expect(await ciQueue.getJob(buildCiSummaryJobId({ githubRepoId: 940003, ...RUN }))).toBe(
+      undefined,
+    );
   });
 });

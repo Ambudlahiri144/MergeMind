@@ -1,0 +1,30 @@
+{
+  "action": "publicized",
+  "repository": {
+    "id": 77700001,
+    "node_id": "R_kgDOAAAAAC",
+    "name": "payments-api",
+    "full_name": "octo-demo/payments-api",
+    "private": false,
+    "owner": {
+      "login": "octo-demo",
+      "id": 9100001,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/octo-demo/payments-api",
+    "default_branch": "main",
+    "visibility": "public",
+    "fork": false
+  },
+  "installation": {
+    "id": 55500001,
+    "node_id": "MDIzOkludGVncmF0aW9uSW5zdGFsbGF0aW9uNTU1MDAwMDE="
+  },
+  "sender": {
+    "login": "dev-alice",
+    "id": 9200001,
+    "node_id": "U_kgDOAAAAAB",
+    "type": "User",
+    "site_admin": false
+  }
+}

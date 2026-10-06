@@ -59,9 +59,20 @@ worker (queue: review, job: review.pr)
 
 ### CI failure flow
 ```
-workflow_run.completed (conclusion=failure, has pull_requests[]) → api → queue ci-summary
-worker: download failed job logs → strip ANSI → window around error markers
-        → LLM summary (failing step, likely cause, evidence lines) → upsert one PR comment
+workflow_run.completed → api decides (ADR-028):
+  failure | timed_out, with a linked PR or from a fork → ci-summary.run (outcome failed)
+  success with a linked PR                             → ci-summary.run (outcome passed)
+  anything else (cancelled, skipped, no PR)            → ignored
+worker (failed):
+  open PRs still at the run's head SHA (fork PRs looked up by SHA) → .mergemind.yml ciSummary.enabled
+  → comment already describes this run attempt or a newer one? stop
+  → jobs of the attempt → failed jobs (max 3) → job logs (404/410 = expired)
+  → strip timestamps + ANSI → failing step's section → window around ##[error] / error lines
+    (≤ 150 lines, 8 KB per job) → redact tokens
+  → budget + provider allowlist → LLM summary (failing step, likely cause, evidence lines, fix)
+    (budget used up, no allowed provider, or outage on the last attempt → excerpt-only comment)
+  → upsert ONE PR comment per workflow (marker <!-- mergemind:ci-workflow=<id> -->)
+worker (passed): rewrite that comment to "passing again"; no LLM call, no new comment
 ```
 
 ### Indexing flow
@@ -85,7 +96,7 @@ mergemind/                         (repo root = A:\Projects\Mergemind)
 │  │  │  ├─ controllers/           thin: parse → call service → respond
 │  │  │  ├─ services/              business logic, no req/res objects
 │  │  │  ├─ webhooks/              signature verify, event router, handlers per event, controller + raw-body route
-│  │  │  ├─ queues/                producers for the jobs the api enqueues (review.producer.ts)
+│  │  │  ├─ queues/                producers for the jobs the api enqueues (review, index, ci-summary)
 │  │  │  ├─ middleware/            auth, validate(zod), requestId, errorHandler, rateLimit
 │  │  │  ├─ config/env.ts          Zod-validated env
 │  │  │  ├─ app.ts                 builds the express app (no listen; testable)
@@ -94,9 +105,11 @@ mergemind/                         (repo root = A:\Projects\Mergemind)
 │  ├─ worker/                      @mergemind/worker   BullMQ processors
 │  │  ├─ src/
 │  │  │  ├─ queues/                Redis connection for workers (names and job options live in @mergemind/shared)
-│  │  │  ├─ processors/            one processor per job name
-│  │  │  ├─ processors/            review.processor.ts, index.processor.ts, ci-summary.processor.ts
+│  │  │  ├─ processors/            one per job name: review.processor.ts, index.processor.ts, ci-summary.processor.ts
 │  │  │  ├─ pipeline/              review stages (one file per stage, see §1)
+│  │  │  ├─ indexing/              code index: tree-sitter chunker, file selection, index job
+│  │  │  ├─ ci/                    CI failure summary: log windowing, redaction, run-ci-summary.ts
+│  │  │  ├─ repository-visibility.ts  escalate-only visibility rule shared by every job (ADR-027)
 │  │  │  ├─ config/env.ts
 │  │  │  └─ main.ts
 │  │  └─ test/integration/
@@ -171,7 +184,7 @@ Indexes: `{ githubInstallationId: 1 }` unique.
 | installationId | ObjectId → installations | |
 | githubRepoId | number | unique |
 | fullName | string | `owner/name` |
-| isPrivate | boolean | drives provider allowlist |
+| isPrivate | boolean | drives provider allowlist. Jobs may only raise it to true; only `repository` events and live GitHub reads lower it (ADR-027) |
 | defaultBranch | string? | unknown until a pull_request/push payload names it (installation payloads omit it) |
 | isInstalled | boolean | false once removed from the installation or the app is uninstalled (PRD F1) |
 | isEnabled | boolean | toggled from UI; reviews need `isInstalled && isEnabled` |
@@ -313,7 +326,8 @@ Indexes: `{ repositoryId: 1, path: 1, symbol: 1 }` unique, `{ repositoryId: 1, n
 | `pull_request` | opened, reopened, synchronize, ready_for_review | enqueue `review.pr` |
 | `pull_request` | closed | update PR state; cancel queued review for that PR |
 | `push` | default branch, not deleted | enqueue `index.repo`; other branches `ignored` (`not_default_branch`) |
-| `workflow_run` | completed + conclusion failure + linked PR | enqueue `ci-summary.run` (Phase 5; until then `ignored`) |
+| `workflow_run` | completed | `failure`/`timed_out` with a linked PR or from a fork → enqueue `ci-summary.run` (failed); `success` with a linked PR → enqueue `ci-summary.run` (passed); otherwise `ignored` (`no_linked_pr`, `conclusion_<x>`). Other actions `unsupported_action` |
+| `repository` | publicized, privatized, renamed | update `fullName`/`isPrivate` of a tracked repo (`handled`), or `ignored: unknown_repository` (ADR-027) |
 | anything else | | `webhookDeliveries.status = ignored` |
 
 ### Queues and jobs
@@ -321,7 +335,7 @@ Indexes: `{ repositoryId: 1, path: 1, symbol: 1 }` unique, `{ repositoryId: 1, n
 |---|---|---|---|---|
 | `review` | `review.pr` | `<githubRepoId>#<prNumber>@<headSha>` (`ready_for_review` appends `-ready`, manual rerun appends `-a<attempt>`; BullMQ forbids `:`, ADR-017/018) | 3 | exponential 10 s, jitter |
 | `index` | `index.repo` | `<githubRepoId>@<commitSha>`, or `@initial` for the first index after installation | 3 | exponential 30 s |
-| `ci-summary` | `ci-summary.run` | `<repoId>#run<workflowRunId>` | 2 | exponential 15 s |
+| `ci-summary` | `ci-summary.run` | `<githubRepoId>#run<workflowRunId>-<runAttempt>` (a re-run keeps the run id and bumps the attempt) | 2 | exponential 15 s |
 
 Concurrency: `review` 4, `index` 1, `ci-summary` 2 (tunable by env).
 
@@ -348,6 +362,7 @@ Retention (`QUEUE_JOB_OPTIONS` in `@mergemind/shared`): completed jobs are kept 
   Providers: `createGroq` (`@ai-sdk/groq`), `createGoogle` (`@ai-sdk/google`), `createOllama` (`ai-sdk-ollama`). A provider without its key is left out of the chain.
 - **Fallback triggers:** any provider error (429, 5xx, timeout `LLM_TIMEOUT_MS` default 45 s, network), or schema validation failure after 1 repair re-ask on the same provider. All providers failing on every chunk → the job retries (BullMQ backoff); on the last attempt the check closes `neutral`.
 - **Circuit breaker:** after 3 consecutive failures, a provider opens for 60 s.
+- **One caller for every LLM use:** `createStructuredCaller` (`structured-call.ts`) owns the chain, the allowlist, the repair re-ask and the circuit breaker. `createReviewLlm` (review passes) and `createCiSummaryLlm` (CI failures, `ci-summary@1`, output `CiSummaryOutputSchema`) share one caller in the worker, so one breaker sees every call (ADR-028). Traces are named by task: `review.<pass>` or `ci-summary`.
 - **Prompts:** `packages/llm/src/prompts/<pass>.prompt.ts` export `{ version, system, buildUser(input) }` (currently `@2`: optional `<context>` block of retrieved code, for reference only). The version is stored on every run.
 - **Determinism:** `temperature: 0` for review passes.
 - **Embeddings:** Ollama `nomic-embed-text` (768 dims) only, so private code stays local. Batched 32 per call, 30 s timeout. Inputs carry the required prefixes: `search_document:` for chunks, `search_query:` for review queries. Vectors of any other size are rejected.

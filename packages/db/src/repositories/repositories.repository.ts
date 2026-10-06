@@ -38,6 +38,14 @@ export type RepositoriesRepository = {
   /** Index finished at `sha`: status `ready` and the base of the next incremental index. */
   markIndexed(repositoryId: string, sha: string): Promise<void>;
   setDefaultBranch(repositoryId: string, defaultBranch: string): Promise<void>;
+  /**
+   * Name/visibility from GitHub for a repo we already track. Never upserts and never touches
+   * `isInstalled`, so it cannot undo an uninstall. Returns whether the repo is tracked.
+   */
+  updateFromGithub(
+    githubRepoId: number,
+    changes: { fullName?: string; isPrivate?: boolean },
+  ): Promise<boolean>;
 };
 
 function buildUpsert(installationId: string, repo: GithubRepositoryInput) {
@@ -158,6 +166,19 @@ export function createRepositoriesRepository(): RepositoriesRepository {
         { _id: new Types.ObjectId(repositoryId) },
         { $set: { defaultBranch } },
       );
+    },
+
+    async updateFromGithub(githubRepoId, changes) {
+      const result = await RepositoryModel.updateOne(
+        { githubRepoId },
+        {
+          $set: {
+            ...(changes.fullName === undefined ? {} : { fullName: changes.fullName }),
+            ...(changes.isPrivate === undefined ? {} : { isPrivate: changes.isPrivate }),
+          },
+        },
+      );
+      return result.matchedCount > 0;
     },
   };
 }

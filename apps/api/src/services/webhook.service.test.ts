@@ -37,6 +37,7 @@ function buildService(options: { claim?: DeliveryClaim; enqueue?: ReviewProducer
     deliveries,
     reviewProducer,
     indexProducer: { enqueue: () => Promise.resolve('index-job'), close: () => Promise.resolve() },
+    ciSummaryProducer: { enqueue: () => Promise.resolve('ci-job'), close: () => Promise.resolve() },
     installations: {} as InstallationsRepository,
     repositories: {} as RepositoriesRepository,
     pullRequests: {} as PullRequestsRepository,

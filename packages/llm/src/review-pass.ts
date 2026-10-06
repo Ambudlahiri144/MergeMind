@@ -7,17 +7,14 @@ import {
   type LlmProviderName,
   type ReviewPass,
 } from '@mergemind/shared';
-import type { Logger } from '@mergemind/shared/logger';
-import { APICallError, NoObjectGeneratedError, Output, generateText, type ModelMessage } from 'ai';
 
-import { CircuitBreaker, systemClock, type Clock } from './circuit-breaker.js';
 import { REVIEW_PROMPTS, type ContextSnippet } from './prompts/index.js';
-import { isProviderAllowed } from './provider-policy.js';
-import type { ProviderEntry } from './providers.js';
-import { noopTracer, type LlmCallOutcome, type LlmTracer } from './tracer.js';
-
-/** Default per-call timeout (Architecture.md §6, `LLM_TIMEOUT_MS`). */
-export const DEFAULT_LLM_TIMEOUT_MS = 45_000;
+import {
+  createStructuredCaller,
+  type LlmCallRecord,
+  type LlmChainConfig,
+  type StructuredCaller,
+} from './structured-call.js';
 
 export type ReviewPassInput = {
   runId: string;
@@ -30,17 +27,6 @@ export type ReviewPassInput = {
   allowedProviders: readonly LlmProviderName[];
 };
 
-/** One provider call, successful or not; each becomes a `usageLedger` row. */
-export type LlmCallRecord = {
-  provider: LlmProviderName;
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  latencyMs: number;
-  isFallback: boolean;
-  outcome: LlmCallOutcome;
-};
-
 export type ReviewPassResult = {
   pass: ReviewPass;
   findings: CandidateFinding[];
@@ -49,63 +35,16 @@ export type ReviewPassResult = {
   provider: LlmProviderName;
 };
 
-/** Every allowed provider failed (or none is allowed). Carries the calls made, for the ledger. */
-export class LlmUnavailableError extends Error {
-  constructor(
-    readonly pass: ReviewPass,
-    readonly calls: readonly LlmCallRecord[],
-    options: { cause?: unknown } = {},
-  ) {
-    super(`No LLM provider completed the ${pass} pass`, options);
-    this.name = 'LlmUnavailableError';
-  }
-}
-
 export type ReviewLlm = {
   reviewPass(input: ReviewPassInput): Promise<ReviewPassResult>;
 };
 
-export type ReviewLlmConfig = {
-  providers: readonly ProviderEntry[];
-  timeoutMs?: number;
-  breaker?: CircuitBreaker;
-  clock?: Clock;
-  tracer?: LlmTracer;
-  logger?: Logger;
-};
+/** A chain of its own, or a caller shared with other LLM uses (one circuit breaker). */
+export type ReviewLlmConfig = LlmChainConfig | { caller: StructuredCaller };
 
-const REPAIR_INSTRUCTION =
-  'Your previous reply did not match the required JSON schema. Reply again with only the JSON object, following every output rule.';
-
-const HTTP_BAD_REQUEST = 400;
-const MAX_REPAIR_ERROR_LENGTH = 300;
-const SCHEMA_REJECTION_PATTERN = /json_validate_failed|does not match the expected schema/i;
-
-/** Groq returns `400 json_validate_failed` when constrained output still breaks the schema. */
-function isServerSchemaRejection(error: unknown): error is APICallError {
-  return (
-    APICallError.isInstance(error) &&
-    error.statusCode === HTTP_BAD_REQUEST &&
-    SCHEMA_REJECTION_PATTERN.test(`${error.message} ${error.responseBody ?? ''}`)
-  );
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-}
-
-/**
- * Runs one review pass down the provider chain (ADR-007, ADR-019):
- * - any provider error (429, 5xx, timeout, bad request) → next provider;
- * - output that fails the schema → one repair re-ask on the same provider, then next provider;
- * - open circuit or not on the private-repo allowlist → provider skipped.
- * `temperature: 0` and `maxRetries: 0`: determinism, and our chain owns retries.
- */
+/** One review pass down the provider chain (ADR-007, ADR-019); see `createStructuredCaller`. */
 export function createReviewLlm(config: ReviewLlmConfig): ReviewLlm {
-  const clock = config.clock ?? systemClock;
-  const breaker = config.breaker ?? new CircuitBreaker(clock);
-  const tracer = config.tracer ?? noopTracer;
-  const timeoutMs = config.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
+  const call = 'caller' in config ? config.caller : createStructuredCaller(config);
 
   return {
     async reviewPass(input) {
@@ -115,110 +54,27 @@ export function createReviewLlm(config: ReviewLlmConfig): ReviewLlm {
         files: input.files,
         ...(input.context === undefined ? {} : { context: input.context }),
       });
-      const chain = config.providers.filter((provider) => isProviderAllowed(provider.name, input));
-      const calls: LlmCallRecord[] = [];
-      let lastError: unknown = new Error('No provider is allowed for this repository');
-
-      for (const provider of chain) {
-        if (!breaker.canCall(provider.name)) {
-          config.logger?.warn({ provider: provider.name, pass: input.pass }, 'provider.skipped');
-          continue;
-        }
-        const isFallback = provider !== chain[0];
-        let messages: ModelMessage[] = [{ role: 'user', content: user }];
-
-        for (let attempt = 0; attempt < 2; attempt += 1) {
-          const startedAt = clock.now();
-          const record = (
-            outcome: LlmCallOutcome,
-            usage?: { inputTokens?: number | undefined; outputTokens?: number | undefined },
-            output?: unknown,
-          ) => {
-            const call: LlmCallRecord = {
-              provider: provider.name,
-              model: provider.modelId,
-              inputTokens: usage?.inputTokens ?? 0,
-              outputTokens: usage?.outputTokens ?? 0,
-              latencyMs: Math.max(0, clock.now() - startedAt),
-              isFallback,
-              outcome,
-            };
-            calls.push(call);
-            tracer.record({
-              ...call,
-              runId: input.runId,
-              pass: input.pass,
-              promptVersion: prompt.version,
-              system: prompt.system,
-              user,
-              output,
-              isPrivateRepo: input.isPrivateRepo,
-            });
-          };
-
-          try {
-            const result = await generateText({
-              model: provider.model,
-              system: prompt.system,
-              messages,
-              output: Output.object({ schema: ReviewPassOutputSchema }),
-              temperature: 0,
-              maxRetries: 0,
-              timeout: timeoutMs,
-            });
-            const output = result.output;
-            record('ok', result.usage, output);
-            breaker.recordSuccess(provider.name);
-            const findings = output.findings
-              .slice(0, MAX_FINDINGS_PER_PASS)
-              .map((finding) => normalizeFinding(finding, input.pass))
-              .filter((finding): finding is CandidateFinding => finding !== null);
-            return {
-              pass: input.pass,
-              findings,
-              calls,
-              promptVersion: prompt.version,
-              provider: provider.name,
-            };
-          } catch (error) {
-            lastError = error;
-            if (NoObjectGeneratedError.isInstance(error)) {
-              record('invalid_output', error.usage, error.text);
-              if (attempt === 0) {
-                messages = [
-                  ...messages,
-                  { role: 'assistant', content: error.text ?? '' },
-                  { role: 'user', content: REPAIR_INSTRUCTION },
-                ];
-                continue;
-              }
-            } else if (isServerSchemaRejection(error)) {
-              // Strict-mode providers (Groq) validate server-side and answer 400 instead of
-              // returning the bad JSON, so the repair re-ask quotes the validator's message.
-              record('invalid_output');
-              if (attempt === 0) {
-                messages = [
-                  ...messages,
-                  {
-                    role: 'user',
-                    content: `${REPAIR_INSTRUCTION}\nValidator error: ${error.message.slice(0, MAX_REPAIR_ERROR_LENGTH)}`,
-                  },
-                ];
-                continue;
-              }
-            } else {
-              record('error');
-            }
-            config.logger?.warn(
-              { provider: provider.name, pass: input.pass, error: describeError(error) },
-              'provider.fallback',
-            );
-            breaker.recordFailure(provider.name);
-            break;
-          }
-        }
-      }
-      throw new LlmUnavailableError(input.pass, calls, { cause: lastError });
+      const result = await call({
+        task: `review.${input.pass}`,
+        runId: input.runId,
+        promptVersion: prompt.version,
+        system: prompt.system,
+        user,
+        schema: ReviewPassOutputSchema,
+        isPrivateRepo: input.isPrivateRepo,
+        allowedProviders: input.allowedProviders,
+      });
+      const findings = result.output.findings
+        .slice(0, MAX_FINDINGS_PER_PASS)
+        .map((finding) => normalizeFinding(finding, input.pass))
+        .filter((finding): finding is CandidateFinding => finding !== null);
+      return {
+        pass: input.pass,
+        findings,
+        calls: result.calls,
+        promptVersion: prompt.version,
+        provider: result.provider,
+      };
     },
   };
 }

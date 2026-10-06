@@ -71,6 +71,41 @@ export function buildIndexJobId(input: { githubRepoId: number; commitSha: string
   return `${input.githubRepoId}@${input.commitSha ?? 'initial'}`;
 }
 
+export const CI_OUTCOMES = ['failed', 'passed'] as const;
+export type CiOutcome = (typeof CI_OUTCOMES)[number];
+
+/** Data carried by a `ci-summary.run` job (PRD F10, ADR-028). */
+export const CiSummaryJobDataSchema = z.object({
+  githubInstallationId: z.number().int().positive(),
+  githubRepoId: z.number().int().positive(),
+  repoFullName: z.string().min(1),
+  isPrivate: z.boolean(),
+  workflowRunId: z.number().int().positive(),
+  workflowId: z.number().int().positive(),
+  workflowName: z.string().min(1),
+  runNumber: z.number().int().positive(),
+  runAttempt: z.number().int().positive(),
+  headSha: GitShaSchema,
+  headBranch: z.string().nullable(),
+  htmlUrl: z.url(),
+  outcome: z.enum(CI_OUTCOMES),
+  /** PRs GitHub linked to the run; empty for fork PRs, which the worker looks up by SHA. */
+  prNumbers: z.array(z.number().int().positive()).max(20),
+});
+export type CiSummaryJobData = z.infer<typeof CiSummaryJobDataSchema>;
+
+/**
+ * `<githubRepoId>#run<workflowRunId>-<runAttempt>`: a re-run keeps the run id and bumps the
+ * attempt, so each attempt is summarised once. BullMQ forbids ':'.
+ */
+export function buildCiSummaryJobId(input: {
+  githubRepoId: number;
+  workflowRunId: number;
+  runAttempt: number;
+}): string {
+  return `${input.githubRepoId}#run${input.workflowRunId}-${input.runAttempt}`;
+}
+
 const SECONDS_PER_DAY = 86_400;
 
 /**

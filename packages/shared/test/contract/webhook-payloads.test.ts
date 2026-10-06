@@ -5,7 +5,9 @@ import {
   InstallationRepositoriesEventSchema,
   PullRequestEventSchema,
   PushEventSchema,
+  RepositoryEventSchema,
   WebhookActionSchema,
+  WorkflowRunEventSchema,
 } from '../../src/index.js';
 import { loadGithubFixture } from '../../src/testing/index.js';
 
@@ -80,5 +82,62 @@ describe('push payload contract', () => {
       deleted: false,
       repository: { default_branch: 'main' },
     });
+  });
+});
+
+describe('repository payload contract', () => {
+  it.each(['repository.publicized', 'repository.privatized', 'repository.renamed'])(
+    '%s parses with RepositoryEventSchema',
+    async (name) => {
+      const { payload } = await loadGithubFixture(name);
+
+      const result = RepositoryEventSchema.safeParse(payload);
+
+      expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+    },
+  );
+
+  it('carries the new name and visibility after a rename', async () => {
+    const { payload } = await loadGithubFixture('repository.renamed');
+
+    expect(RepositoryEventSchema.parse(payload).repository).toEqual({
+      id: 77700001,
+      full_name: 'octo-demo/billing-api',
+      private: true,
+    });
+  });
+});
+
+describe('workflow_run payload contract', () => {
+  it.each([
+    'workflow_run.completed-failure',
+    'workflow_run.completed-success',
+    'workflow_run.completed-fork',
+  ])('%s parses with WorkflowRunEventSchema', async (name) => {
+    const { payload } = await loadGithubFixture(name);
+
+    const result = WorkflowRunEventSchema.safeParse(payload);
+
+    expect(result.success, JSON.stringify(result.error?.issues)).toBe(true);
+  });
+
+  it('keeps the linked PR number and head SHA only', async () => {
+    const { payload } = await loadGithubFixture('workflow_run.completed-failure');
+
+    const run = WorkflowRunEventSchema.parse(payload).workflow_run;
+
+    expect(run.pull_requests).toEqual([
+      { number: 42, head: { sha: 'c3d4e5f60718293a4b5c6d7e8f9012345678901a' } },
+    ]);
+    expect(run).toMatchObject({ conclusion: 'failure', run_attempt: 1, workflow_id: 66600001 });
+  });
+
+  it('accepts a fork run with no linked PRs and a foreign head repository', async () => {
+    const { payload } = await loadGithubFixture('workflow_run.completed-fork');
+
+    const run = WorkflowRunEventSchema.parse(payload).workflow_run;
+
+    expect(run.pull_requests).toEqual([]);
+    expect(run.head_repository?.id).toBe(77700099);
   });
 });

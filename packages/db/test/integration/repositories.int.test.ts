@@ -156,6 +156,34 @@ describe('installations and repositories', () => {
     expect((await repositories.findByGithubRepoId(6001))?.isInstalled).toBe(true);
     expect((await repositories.findByGithubRepoId(6002))?.isInstalled).toBe(false);
   });
+
+  it('updates name and visibility from GitHub without reinstalling or creating repos', async () => {
+    const installationId = await installations.upsertFromGithub({
+      githubInstallationId: 1004,
+      accountLogin: 'gamma',
+      accountType: 'User',
+      status: 'active',
+    });
+    await repositories.upsertManyForInstallation(installationId, [
+      { githubRepoId: 7001, fullName: 'gamma/old', isPrivate: true },
+    ]);
+    await repositories.markUninstalled([7001]);
+
+    const isTracked = await repositories.updateFromGithub(7001, {
+      fullName: 'gamma/new',
+      isPrivate: false,
+    });
+    const isUnknownTracked = await repositories.updateFromGithub(7999, { isPrivate: false });
+
+    expect(isTracked).toBe(true);
+    expect(isUnknownTracked).toBe(false);
+    expect(await repositories.findByGithubRepoId(7001)).toMatchObject({
+      fullName: 'gamma/new',
+      isPrivate: false,
+      isInstalled: false,
+    });
+    expect(await repositories.findByGithubRepoId(7999)).toBeNull();
+  });
 });
 
 describe('pullRequests.upsertIfNewer', () => {

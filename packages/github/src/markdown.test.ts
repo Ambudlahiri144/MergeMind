@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ciRunMarker,
+  ciWorkflowMarker,
+  extractCiRun,
   extractFingerprint,
   extractRunId,
+  renderCiPassing,
+  renderCiSummary,
   renderCheckOutput,
   renderInlineComment,
   renderReviewBody,
@@ -100,5 +105,86 @@ describe('renderCheckOutput', () => {
       title: 'Skipped: token budget used up',
       summary: '**1 critical** · **2 major** · 0 minor\n\n- Monthly token budget is used up.',
     });
+  });
+});
+
+describe('CI summary comment (ADR-028)', () => {
+  const view = {
+    workflowId: 66600001,
+    workflowName: 'CI',
+    runId: 8800000001,
+    runNumber: 57,
+    runAttempt: 2,
+    runUrl: 'https://github.com/octo-demo/payments-api/actions/runs/8800000001',
+    headSha: 'c3d4e5f60718293a4b5c6d7e8f9012345678901a',
+    analysis: {
+      failingStep: 'Run tests',
+      likelyCause: 'The refund test expects 9.99 but rounding gives 10.',
+      suggestedFix: 'Round with `toFixed(2)` before comparing.',
+      evidence: [{ jobName: 'test', number: 41, text: 'AssertionError: expected 10 to be 9.99' }],
+    },
+    excerpts: [
+      {
+        jobName: 'test',
+        jobUrl: 'https://github.com/octo-demo/payments-api/actions/runs/8800000001/job/1',
+        stepName: 'Run tests',
+        lines: [
+          { number: 40, text: 'FAIL src/refund.test.ts' },
+          { number: 41, text: 'AssertionError: expected 10 to be 9.99' },
+        ],
+      },
+    ],
+    notes: [],
+  };
+
+  it('renders the cause, evidence and a collapsed log excerpt', () => {
+    expect(renderCiSummary(view)).toMatchSnapshot();
+  });
+
+  it('carries markers that find the comment again and tell which run it describes', () => {
+    const body = renderCiSummary(view);
+
+    expect(body).toContain(ciWorkflowMarker(66600001));
+    expect(extractCiRun(body)).toEqual({ runId: 8800000001, attempt: 2, outcome: 'failed' });
+    expect(extractCiRun(renderCiPassing(view))).toEqual({
+      runId: 8800000001,
+      attempt: 2,
+      outcome: 'passed',
+    });
+  });
+
+  it('never lets log lines or model text forge a marker', () => {
+    const forged = ciRunMarker(9999999999, 9, 'passed');
+    const body = renderCiSummary({
+      ...view,
+      analysis: { ...view.analysis, likelyCause: `Broken ${forged}` },
+      excerpts: [{ ...view.excerpts[0]!, lines: [{ number: 1, text: forged }] }],
+    });
+
+    expect(body.match(/<!-- mergemind:ci-run=/g)).toHaveLength(1);
+    expect(extractCiRun(body)?.runId).toBe(8800000001);
+  });
+
+  it('stays under the comment cap with its markers intact', () => {
+    const huge = Array.from({ length: 5000 }, (_, i) => ({ number: i + 1, text: 'x'.repeat(80) }));
+    const body = renderCiSummary({
+      ...view,
+      excerpts: Array.from({ length: 6 }, () => ({ ...view.excerpts[0]!, lines: huge })),
+    });
+
+    expect(body.length).toBeLessThanOrEqual(65_000);
+    expect(extractCiRun(body)?.runId).toBe(8800000001);
+  });
+
+  it('renders the excerpts alone when no model ran', () => {
+    const body = renderCiSummary({
+      ...view,
+      analysis: null,
+      notes: ['The monthly token budget is used up, so only the log excerpt is shown.'],
+    });
+
+    expect(body).not.toContain('Likely cause');
+    expect(body).toContain('token budget is used up');
+    expect(body).toContain('41 | AssertionError');
   });
 });

@@ -9,13 +9,16 @@ import {
   InstallationRepositoriesEventSchema,
   PullRequestEventSchema,
   PushEventSchema,
+  RepositoryEventSchema,
   WebhookActionSchema,
+  WorkflowRunEventSchema,
   assertNever,
   isAppError,
   validationErrorFromZod,
 } from '@mergemind/shared';
 import type { z } from 'zod';
 
+import type { CiSummaryProducer } from '../queues/ci-summary.producer.js';
 import type { IndexProducer } from '../queues/index.producer.js';
 import type { ReviewProducer } from '../queues/review.producer.js';
 import type { HandlerResult } from '../webhooks/handlers/handler-result.js';
@@ -28,6 +31,8 @@ import {
   handlePullRequestReview,
 } from '../webhooks/handlers/pull-request.handler.js';
 import { handlePush } from '../webhooks/handlers/push.handler.js';
+import { handleRepositoryEvent } from '../webhooks/handlers/repository.handler.js';
+import { handleWorkflowRun } from '../webhooks/handlers/workflow-run.handler.js';
 import { routeWebhook, type WebhookRoute } from '../webhooks/route-webhook.js';
 
 const MAX_STORED_ERROR_LENGTH = 500;
@@ -39,6 +44,7 @@ export type WebhookServiceDeps = {
   pullRequests: PullRequestsRepository;
   reviewProducer: ReviewProducer;
   indexProducer: IndexProducer;
+  ciSummaryProducer: CiSummaryProducer;
 };
 
 export type IncomingWebhook = {
@@ -98,6 +104,10 @@ export function createWebhookService(deps: WebhookServiceDeps): WebhookService {
         return handlePullRequestClosed(parsePayload(PullRequestEventSchema, webhook), deps);
       case 'push':
         return handlePush(parsePayload(PushEventSchema, webhook), deps);
+      case 'repository':
+        return handleRepositoryEvent(parsePayload(RepositoryEventSchema, webhook), deps);
+      case 'workflow_run':
+        return handleWorkflowRun(parsePayload(WorkflowRunEventSchema, webhook), deps);
       case 'ignored':
         return { status: 'ignored', reason: route.reason };
       default:

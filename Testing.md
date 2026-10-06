@@ -70,6 +70,7 @@ test/setup/                                    shared Testcontainers + MSW setup
 - **Policy:** `.mergemind.yml` merge with defaults; invalid YAML → defaults + reported errors.
 - **Severity gate:** each `failOn` value × finding mixes → expected conclusion.
 - **Fingerprint:** stable under line shifts and whitespace changes; differs across paths and passes.
+- **CI log window:** timestamps and ANSI stripped, failing step's section only, `##[error]`-anchored windows within 150 lines / 8 KB, tail fallback without markers, original line numbers, token redaction.
 - **Post-processing:** dedupe, suppression filter, confidence filter, ordering.
 - **Provider chain:** fallback on 429, 5xx, timeout and schema failure; circuit breaker opens after 3 failures and half-opens after cooldown; private-repo allowlist enforced.
 - **Budget:** 80% warn and 100% skip thresholds; month rollover.
@@ -89,7 +90,13 @@ test/setup/                                    shared Testcontainers + MSW setup
 - **Index processor:** a first full index stores symbol chunks and marks the repo ready. A later push re-embeds only changed symbols and deletes removed files. A redelivered head is skipped. A private repo without Ollama on its allowlist is never embedded.
 - **Vector search:** the index is created on atlas-local; `$vectorSearch` returns the seeded chunk filtered by `repositoryId`.
 - **API:** auth required (401 without JWT, 403 for a foreign installation); cursor pagination; `problem+json` error shape.
-- **CI summary:** `workflow_run` failure → logs fetched (MSW) → one comment upserted (not duplicated on redelivery).
+- **CI summary:** `workflow_run` failure → logs fetched (MSW) → one comment upserted (not duplicated on redelivery). Also covered:
+  - a re-run attempt updates the same comment, and a late older attempt never overwrites it;
+  - a later success marks the comment passing, with no LLM call;
+  - fork PRs are found by head SHA, and a moved PR head skips the run;
+  - private repo outside the allowlist, exhausted budget, or provider outage on the last attempt → excerpt-only comment;
+  - expired logs are reported in the comment; `ciSummary.enabled: false` skips the run.
+- **Repository visibility:** `repository.publicized`/`renamed` update a tracked repo; an unknown repo is ignored; a job payload may only escalate a repo to private (ADR-027).
 
 ### E2E
 - Sign-in (Auth.js mocked provider), then repository list, then PR, then run detail with findings.

@@ -56,6 +56,22 @@ type ReviewRequestBody = {
   comments?: { path: string; line: number; start_line?: number; body: string }[];
 };
 
+export type FakeJob = {
+  id: number;
+  name: string;
+  conclusion: string | null;
+  html_url: string;
+  steps: { name: string; number: number; conclusion: string | null }[];
+};
+
+export type FakeIssueComment = {
+  id: number;
+  repo: string;
+  issueNumber: number;
+  body: string;
+  editCount: number;
+};
+
 export type FakeGithub = {
   handlers: HttpHandler[];
   /** `owner/repo#number` → files returned by listFiles. */
@@ -86,6 +102,16 @@ export type FakeGithub = {
   resolvedThreads: Set<string>;
   /** Simulate GitHub refusing resolveReviewThread without Contents: write. */
   isThreadResolveForbidden: boolean;
+  /** `owner/repo:runId@attempt` → jobs of that run attempt. */
+  runJobs: Map<string, FakeJob[]>;
+  /** `owner/repo:jobId` → plain-text job log; a missing key answers 404 (expired). */
+  jobLogs: Map<string, string>;
+  /** `owner/repo:sha` → PRs whose commits include it. */
+  commitPulls: Map<string, { number: number; state: 'open' | 'closed'; headSha: string }[]>;
+  /** `owner/repo#number` → PR state; a missing key answers 404. */
+  pullStates: Map<string, { state: 'open' | 'closed'; headSha: string }>;
+  /** PR conversation comments (issue comments), with how often each was edited. */
+  issueComments: FakeIssueComment[];
   /** Make the next `times` requests matching method + path regex fail with `status`. */
   failNext(method: string, pattern: RegExp, status: number, times?: number): void;
   reset(): void;
@@ -112,6 +138,11 @@ export function createFakeGithub(): FakeGithub {
     replies: [],
     resolvedThreads: new Set(),
     isThreadResolveForbidden: false,
+    runJobs: new Map(),
+    jobLogs: new Map(),
+    commitPulls: new Map(),
+    pullStates: new Map(),
+    issueComments: [],
     failNext(method, pattern, status, times = 1) {
       faults.push({ method, pattern, status, remaining: times });
     },
@@ -131,6 +162,11 @@ export function createFakeGithub(): FakeGithub {
       fake.replies.length = 0;
       fake.resolvedThreads.clear();
       fake.isThreadResolveForbidden = false;
+      fake.runJobs.clear();
+      fake.jobLogs.clear();
+      fake.commitPulls.clear();
+      fake.pullStates.clear();
+      fake.issueComments.length = 0;
       faults.length = 0;
     },
   };
@@ -407,6 +443,95 @@ export function createFakeGithub(): FakeGithub {
         },
       });
     }),
+
+    http.get(
+      `${API}/repos/:owner/:repo/actions/runs/:runId/attempts/:attempt/jobs`,
+      ({ params, request }) => {
+        const repo = `${String(params.owner)}/${String(params.repo)}`;
+        const jobs = fake.runJobs.get(`${repo}:${String(params.runId)}@${String(params.attempt)}`);
+        const page = paginate(jobs ?? [], new URL(request.url));
+        return HttpResponse.json({ total_count: jobs?.length ?? 0, jobs: page });
+      },
+    ),
+
+    http.get(`${API}/repos/:owner/:repo/actions/jobs/:jobId/logs`, ({ params }) => {
+      const log = fake.jobLogs.get(
+        `${String(params.owner)}/${String(params.repo)}:${String(params.jobId)}`,
+      );
+      // GitHub answers 302 to blob storage; serving the text directly keeps MSW to one host.
+      return log === undefined
+        ? HttpResponse.json({ message: 'Not Found' }, { status: 404 })
+        : HttpResponse.text(log);
+    }),
+
+    http.get(`${API}/repos/:owner/:repo/commits/:sha/pulls`, ({ params }) => {
+      const pulls =
+        fake.commitPulls.get(
+          `${String(params.owner)}/${String(params.repo)}:${String(params.sha)}`,
+        ) ?? [];
+      return HttpResponse.json(
+        pulls.map((pr) => ({ number: pr.number, state: pr.state, head: { sha: pr.headSha } })),
+      );
+    }),
+
+    http.get(`${API}/repos/:owner/:repo/pulls/:number`, ({ params }) => {
+      const state = fake.pullStates.get(
+        `${String(params.owner)}/${String(params.repo)}#${String(params.number)}`,
+      );
+      return state === undefined
+        ? HttpResponse.json({ message: 'Not Found' }, { status: 404 })
+        : HttpResponse.json({
+            number: Number(params.number),
+            state: state.state,
+            head: { sha: state.headSha },
+          });
+    }),
+
+    http.get(`${API}/repos/:owner/:repo/issues/:number/comments`, ({ params, request }) => {
+      const repo = `${String(params.owner)}/${String(params.repo)}`;
+      const comments = fake.issueComments.filter(
+        (comment) => comment.repo === repo && comment.issueNumber === Number(params.number),
+      );
+      return HttpResponse.json(
+        paginate(comments, new URL(request.url)).map((comment) => ({
+          id: comment.id,
+          body: comment.body,
+        })),
+      );
+    }),
+
+    http.post(`${API}/repos/:owner/:repo/issues/:number/comments`, async ({ params, request }) => {
+      const body = (await request.json()) as { body: string };
+      const comment: FakeIssueComment = {
+        id: (nextId += 1),
+        repo: `${String(params.owner)}/${String(params.repo)}`,
+        issueNumber: Number(params.number),
+        body: body.body,
+        editCount: 0,
+      };
+      fake.issueComments.push(comment);
+      return HttpResponse.json({ id: comment.id, body: comment.body }, { status: 201 });
+    }),
+
+    http.patch(
+      `${API}/repos/:owner/:repo/issues/comments/:commentId`,
+      async ({ params, request }) => {
+        const comment = fake.issueComments.find((c) => c.id === Number(params.commentId));
+        if (!comment) {
+          return HttpResponse.json({ message: 'Not Found' }, { status: 404 });
+        }
+        comment.body = ((await request.json()) as { body: string }).body;
+        comment.editCount += 1;
+        return HttpResponse.json({ id: comment.id, body: comment.body });
+      },
+    ),
   ];
   return fake;
+}
+
+/** GitHub-style `per_page` / `page` slicing (defaults 30 / 1). */
+function paginate<T>(items: readonly T[], url: URL): T[] {
+  const perPage = Number(url.searchParams.get('per_page') ?? '30');
+  const page = Number(url.searchParams.get('page') ?? '1');
+  return items.slice((page - 1) * perPage, page * perPage);
 }

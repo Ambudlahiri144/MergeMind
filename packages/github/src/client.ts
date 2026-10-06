@@ -16,7 +16,11 @@ const PER_PAGE = 100;
 const MAX_FILE_PAGES = 30;
 const MAX_REVIEW_PAGES = 10;
 const MAX_COMMENT_PAGES = 5;
+const MAX_JOB_PAGES = 3;
 const HTTP_NOT_FOUND = 404;
+const HTTP_GONE = 410;
+/** Job logs above this keep only their tail (failures are reported at the end). */
+export const MAX_JOB_LOG_CHARS = 10_000_000;
 
 const ReviewOctokit = Octokit.plugin(throttling, retry);
 type ReviewOctokitInstance = InstanceType<typeof ReviewOctokit>;
@@ -117,7 +121,33 @@ export type GithubInstallationClient = {
   resolveReviewThreads(
     input: RepoRef & { pullNumber: number; commentIds: readonly number[] },
   ): Promise<{ resolvedCount: number; isPermissionDenied: boolean }>;
+  /** Jobs of one attempt of a workflow run (PRD F10; needs Actions: read). */
+  listRunJobs(input: RepoRef & { runId: number; attempt: number }): Promise<WorkflowJob[]>;
+  /**
+   * A job's plain-text log, or null when it is gone (404/410: expired or deleted). Very large
+   * logs keep only their tail, where failures are reported.
+   */
+  getJobLog(input: RepoRef & { jobId: number }): Promise<string | null>;
+  /** PRs whose commits include `sha`; finds fork PRs, which `workflow_run` does not link. */
+  listPullRequestsForCommit(input: RepoRef & { sha: string }): Promise<PullRequestRef[]>;
+  getPullRequestState(input: RepoRef & { pullNumber: number }): Promise<PullRequestRef>;
+  /** The PR conversation comment whose body contains `marker`, if any (ADR-028). */
+  findIssueCommentByMarker(
+    input: RepoRef & { issueNumber: number; marker: string },
+  ): Promise<{ id: number; body: string } | null>;
+  createIssueComment(input: RepoRef & { issueNumber: number; body: string }): Promise<number>;
+  updateIssueComment(input: RepoRef & { commentId: number; body: string }): Promise<void>;
 };
+
+export type WorkflowJob = {
+  id: number;
+  name: string;
+  conclusion: string | null;
+  htmlUrl: string | null;
+  steps: { name: string; number: number; conclusion: string | null }[];
+};
+
+export type PullRequestRef = { number: number; state: 'open' | 'closed'; headSha: string };
 
 export const COMPARE_STATUSES = ['ahead', 'behind', 'diverged', 'identical'] as const;
 export type CompareStatus = (typeof COMPARE_STATUSES)[number];
@@ -394,6 +424,128 @@ function createInstallationClient(octokit: ReviewOctokitInstance): GithubInstall
           body,
         });
         return data.id;
+      }),
+
+    listRunJobs: ({ owner, repo, runId, attempt }) =>
+      callGithub('listJobsForWorkflowRunAttempt', async () => {
+        const jobs: WorkflowJob[] = [];
+        for (let page = 1; page <= MAX_JOB_PAGES; page += 1) {
+          const { data } = await octokit.rest.actions.listJobsForWorkflowRunAttempt({
+            owner,
+            repo,
+            run_id: runId,
+            attempt_number: attempt,
+            per_page: PER_PAGE,
+            page,
+          });
+          jobs.push(
+            ...data.jobs.map((job) => ({
+              id: job.id,
+              name: job.name,
+              conclusion: job.conclusion,
+              htmlUrl: job.html_url,
+              steps: (job.steps ?? []).map((step) => ({
+                name: step.name,
+                number: step.number,
+                conclusion: step.conclusion,
+              })),
+            })),
+          );
+          if (data.jobs.length < PER_PAGE) {
+            break;
+          }
+        }
+        return jobs;
+      }),
+
+    getJobLog: ({ owner, repo, jobId }) =>
+      callGithub('downloadJobLogsForWorkflowRun', async () => {
+        try {
+          // 302 to a short-lived URL; fetch follows it (and drops our auth header cross-origin).
+          const { data } = await octokit.request(
+            'GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs',
+            {
+              owner,
+              repo,
+              job_id: jobId,
+            },
+          );
+          const text =
+            typeof data === 'string'
+              ? data
+              : data instanceof ArrayBuffer
+                ? new TextDecoder().decode(data)
+                : '';
+          return text.length > MAX_JOB_LOG_CHARS ? text.slice(-MAX_JOB_LOG_CHARS) : text;
+        } catch (error) {
+          const status = statusOf(error);
+          if (status === HTTP_NOT_FOUND || status === HTTP_GONE) {
+            return null;
+          }
+          throw error;
+        }
+      }),
+
+    listPullRequestsForCommit: ({ owner, repo, sha }) =>
+      callGithub('listPullRequestsAssociatedWithCommit', async () => {
+        const { data } = await octokit.rest.repos.listPullRequestsAssociatedWithCommit({
+          owner,
+          repo,
+          commit_sha: sha,
+          per_page: PER_PAGE,
+        });
+        return data.map((pr) => ({
+          number: pr.number,
+          state: pr.state === 'open' ? ('open' as const) : ('closed' as const),
+          headSha: pr.head.sha,
+        }));
+      }),
+
+    getPullRequestState: ({ owner, repo, pullNumber }) =>
+      callGithub('getPullRequest', async () => {
+        const { data } = await octokit.rest.pulls.get({ owner, repo, pull_number: pullNumber });
+        return {
+          number: data.number,
+          state: data.state === 'open' ? ('open' as const) : ('closed' as const),
+          headSha: data.head.sha,
+        };
+      }),
+
+    findIssueCommentByMarker: ({ owner, repo, issueNumber, marker }) =>
+      callGithub('listIssueComments', async () => {
+        for (let page = 1; page <= MAX_COMMENT_PAGES * 2; page += 1) {
+          const { data } = await octokit.rest.issues.listComments({
+            owner,
+            repo,
+            issue_number: issueNumber,
+            per_page: PER_PAGE,
+            page,
+          });
+          const match = data.find((comment) => comment.body?.includes(marker));
+          if (match) {
+            return { id: match.id, body: match.body ?? '' };
+          }
+          if (data.length < PER_PAGE) {
+            break;
+          }
+        }
+        return null;
+      }),
+
+    createIssueComment: ({ owner, repo, issueNumber, body }) =>
+      callGithub('createIssueComment', async () => {
+        const { data } = await octokit.rest.issues.createComment({
+          owner,
+          repo,
+          issue_number: issueNumber,
+          body,
+        });
+        return data.id;
+      }),
+
+    updateIssueComment: ({ owner, repo, commentId, body }) =>
+      callGithub('updateIssueComment', async () => {
+        await octokit.rest.issues.updateComment({ owner, repo, comment_id: commentId, body });
       }),
 
     resolveReviewThreads: async ({ owner, repo, pullNumber, commentIds }) => {

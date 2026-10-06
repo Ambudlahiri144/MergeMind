@@ -1,5 +1,32 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`CI summary comment (ADR-028) > renders the cause, evidence and a collapsed log excerpt 1`] = `
+"### MergeMind: \`CI\` failed (run #57, attempt 2)
+
+**Failing step:** Run tests
+
+**Likely cause:** The refund test expects 9.99 but rounding gives 10.
+
+**Suggested fix:** Round with \`toFixed(2)\` before comparing.
+
+**Evidence**
+- test, line 41: \`AssertionError: expected 10 to be 9.99\`
+
+<details><summary>Log excerpt: test → Run tests, lines 40-41</summary>
+
+\`\`\`
+40 | FAIL src/refund.test.ts
+41 | AssertionError: expected 10 to be 9.99
+\`\`\`
+
+</details> · [job log](https://github.com/octo-demo/payments-api/actions/runs/8800000001/job/1)
+
+Commit \`c3d4e5f\` · [View run](https://github.com/octo-demo/payments-api/actions/runs/8800000001)
+
+<!-- mergemind:ci-workflow=66600001 -->
+<!-- mergemind:ci-run=8800000001.2:failed -->"
+`;
+
 exports[`renderInlineComment > renders severity, title, body, a fenced fix and the fingerprint marker 1`] = `
 "**Critical:** SQL injection in findUser
 

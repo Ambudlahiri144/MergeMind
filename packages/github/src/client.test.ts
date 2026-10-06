@@ -262,3 +262,77 @@ describe('incremental review and indexing endpoints', () => {
     expect(fake.resolvedThreads.has(`thread-${comment?.id}`)).toBe(true);
   });
 });
+
+describe('CI summary endpoints (PRD F10)', () => {
+  const SHA = 'c3d4e5f60718293a4b5c6d7e8f9012345678901a';
+
+  it('lists the jobs of one run attempt across pages', async () => {
+    const jobs = Array.from({ length: 101 }, (_, index) => ({
+      id: index + 1,
+      name: `job ${index + 1}`,
+      conclusion: index === 100 ? 'failure' : 'success',
+      html_url: `https://github.com/octo-demo/payments-api/actions/runs/9/job/${index + 1}`,
+      steps: [{ name: 'Run tests', number: 3, conclusion: 'failure' }],
+    }));
+    fake.runJobs.set('octo-demo/payments-api:9@2', jobs);
+
+    const listed = await client.listRunJobs({ ...repo, runId: 9, attempt: 2 });
+
+    expect(listed).toHaveLength(101);
+    expect(listed.at(-1)).toEqual({
+      id: 101,
+      name: 'job 101',
+      conclusion: 'failure',
+      htmlUrl: 'https://github.com/octo-demo/payments-api/actions/runs/9/job/101',
+      steps: [{ name: 'Run tests', number: 3, conclusion: 'failure' }],
+    });
+  });
+
+  it('reads a job log as text, and null once it expired (404 or 410)', async () => {
+    fake.jobLogs.set('octo-demo/payments-api:7', '2026-10-06T10:00:00.0000000Z ##[error]boom\n');
+
+    expect(await client.getJobLog({ ...repo, jobId: 7 })).toContain('##[error]boom');
+    expect(await client.getJobLog({ ...repo, jobId: 8 })).toBeNull();
+    fake.failNext('GET', /actions\/jobs\/7\/logs/, 410);
+    expect(await client.getJobLog({ ...repo, jobId: 7 })).toBeNull();
+  });
+
+  it('finds PRs by commit and reads a PR state', async () => {
+    fake.commitPulls.set(`octo-demo/payments-api:${SHA}`, [
+      { number: 42, state: 'open', headSha: SHA },
+    ]);
+    fake.pullStates.set('octo-demo/payments-api#42', { state: 'closed', headSha: SHA });
+
+    expect(await client.listPullRequestsForCommit({ ...repo, sha: SHA })).toEqual([
+      { number: 42, state: 'open', headSha: SHA },
+    ]);
+    expect(await client.getPullRequestState({ ...repo, pullNumber: 42 })).toEqual({
+      number: 42,
+      state: 'closed',
+      headSha: SHA,
+    });
+  });
+
+  it('creates, finds by marker and updates one PR conversation comment', async () => {
+    const id = await client.createIssueComment({
+      ...repo,
+      issueNumber: 42,
+      body: 'CI failed <!-- mergemind:ci-workflow=5 -->',
+    });
+
+    const found = await client.findIssueCommentByMarker({
+      ...repo,
+      issueNumber: 42,
+      marker: '<!-- mergemind:ci-workflow=5 -->',
+    });
+    await client.updateIssueComment({ ...repo, commentId: id, body: 'CI passing' });
+
+    expect(found?.id).toBe(id);
+    expect(fake.issueComments).toEqual([
+      expect.objectContaining({ id, issueNumber: 42, body: 'CI passing', editCount: 1 }),
+    ]);
+    expect(
+      await client.findIssueCommentByMarker({ ...repo, issueNumber: 42, marker: 'absent' }),
+    ).toBeNull();
+  });
+});

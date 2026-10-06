@@ -7,7 +7,8 @@ import { CircuitBreaker, type Clock } from './circuit-breaker.js';
 import { promptVersionFor } from './prompts/index.js';
 import { renderFileDiff } from './prompts/render-diff.js';
 import type { ProviderEntry } from './providers.js';
-import { LlmUnavailableError, createReviewLlm, type ReviewPassInput } from './review-pass.js';
+import { createReviewLlm, type ReviewPassInput } from './review-pass.js';
+import { LlmUnavailableError } from './structured-call.js';
 
 type GenerateResult = Awaited<ReturnType<MockLanguageModelV4['doGenerate']>>;
 

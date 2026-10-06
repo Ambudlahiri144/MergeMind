@@ -8,6 +8,7 @@ import {
   type SkipReason,
 } from '@mergemind/shared';
 
+import { escalateVisibility } from '../repository-visibility.js';
 import type { ReviewDeps } from './types.js';
 
 export type BaseContext = {
@@ -51,7 +52,7 @@ async function ensureRepository(
   const known = await deps.repositories.findByGithubRepoId(data.githubRepoId);
   // Never re-create a repo that was uninstalled: that would undo the uninstall (PRD F1).
   if (known) {
-    return known;
+    return escalateVisibility(known, data.isPrivate, deps.repositories);
   }
   await deps.repositories.upsertForInstallation(installationId, {
     githubRepoId: data.githubRepoId,

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { QUEUE_JOB_OPTIONS, buildIndexJobId, buildReviewJobId } from './jobs.js';
+import {
+  QUEUE_JOB_OPTIONS,
+  buildCiSummaryJobId,
+  buildIndexJobId,
+  buildReviewJobId,
+} from './jobs.js';
 
 const HEAD_SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 
@@ -59,5 +64,16 @@ describe('buildIndexJobId', () => {
       `7@${'a'.repeat(40)}`,
     );
     expect(buildIndexJobId({ githubRepoId: 7, commitSha: null })).toBe('7@initial');
+  });
+});
+
+describe('buildCiSummaryJobId', () => {
+  it('gives each run attempt its own id without a colon', () => {
+    const first = buildCiSummaryJobId({ githubRepoId: 777, workflowRunId: 8800, runAttempt: 1 });
+    const rerun = buildCiSummaryJobId({ githubRepoId: 777, workflowRunId: 8800, runAttempt: 2 });
+
+    expect(first).toBe('777#run8800-1');
+    expect(rerun).toBe('777#run8800-2');
+    expect(first).not.toContain(':');
   });
 });

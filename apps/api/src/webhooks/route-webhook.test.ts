@@ -40,11 +40,21 @@ describe('routeWebhook', () => {
     expect(routeWebhook('push', undefined)).toEqual({ kind: 'push' });
   });
 
-  it.each(['workflow_run'])('ignores %s until its phase lands', (event) => {
-    expect(routeWebhook(event, 'completed')).toEqual({
-      kind: 'ignored',
-      reason: 'not_yet_supported',
-    });
+  it.each(['publicized', 'privatized', 'renamed'])('routes repository.%s', (action) => {
+    expect(routeWebhook('repository', action)).toEqual({ kind: 'repository' });
+  });
+
+  it('routes workflow_run.completed to the CI summary handler', () => {
+    expect(routeWebhook('workflow_run', 'completed')).toEqual({ kind: 'workflow_run' });
+  });
+
+  it.each([
+    ['workflow_run', 'requested'],
+    ['workflow_run', 'in_progress'],
+    ['repository', 'created'],
+    ['repository', 'archived'],
+  ])('ignores %s.%s as unsupported_action', (event, action) => {
+    expect(routeWebhook(event, action)).toEqual({ kind: 'ignored', reason: 'unsupported_action' });
   });
 
   it.each(['ping', 'issues', 'star'])('ignores %s as unsupported_event', (event) => {

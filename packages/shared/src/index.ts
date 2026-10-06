@@ -7,6 +7,7 @@ export * from './errors.js';
 export * from './github/webhook-headers.js';
 export * from './github/webhook-payloads.js';
 export * from './jobs.js';
+export * from './ci-summary.js';
 export * from './shutdown.js';
 export * from './review/budget.js';
 export * from './review/diff-types.js';

@@ -1,0 +1,37 @@
+{
+  "action": "renamed",
+  "changes": {
+    "repository": {
+      "name": {
+        "from": "payments-api"
+      }
+    }
+  },
+  "repository": {
+    "id": 77700001,
+    "node_id": "R_kgDOAAAAAC",
+    "name": "billing-api",
+    "full_name": "octo-demo/billing-api",
+    "private": true,
+    "owner": {
+      "login": "octo-demo",
+      "id": 9100001,
+      "type": "Organization"
+    },
+    "html_url": "https://github.com/octo-demo/billing-api",
+    "default_branch": "main",
+    "visibility": "private",
+    "fork": false
+  },
+  "installation": {
+    "id": 55500001,
+    "node_id": "MDIzOkludGVncmF0aW9uSW5zdGFsbGF0aW9uNTU1MDAwMDE="
+  },
+  "sender": {
+    "login": "dev-alice",
+    "id": 9200001,
+    "node_id": "U_kgDOAAAAAB",
+    "type": "User",
+    "site_admin": false
+  }
+}
