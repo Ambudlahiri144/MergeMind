@@ -73,7 +73,10 @@ export type Classification = {
 /** Two findings this close in the same file and category describe one issue. */
 export const MERGE_LINE_TOLERANCE = 2;
 
-type ClaimedRegion = Pick<PreparedFinding, 'path' | 'category' | 'lineStart' | 'lineEnd'>;
+/** Where an issue sits: enough to tell whether two reports describe the same one. */
+export type IssueRegion = Pick<PreparedFinding, 'path' | 'category' | 'lineStart' | 'lineEnd'>;
+
+type ClaimedRegion = IssueRegion;
 
 /**
  * Categories that describe the same issue when they land on the same lines: unchecked input
@@ -95,17 +98,18 @@ function mergeFamily(category: PreparedFinding['category']): string {
  * security and correctness); fingerprints include the pass, so this is the cross-pass merge
  * (ADR-021). `other` is too broad to merge on.
  */
-function isRestatement(finding: PreparedFinding, claimed: readonly ClaimedRegion[]): boolean {
-  if (finding.category === 'other') {
-    return false;
-  }
-  return claimed.some(
-    (region) =>
-      region.path === finding.path &&
-      mergeFamily(region.category) === mergeFamily(finding.category) &&
-      finding.lineStart <= region.lineEnd + MERGE_LINE_TOLERANCE &&
-      region.lineStart <= finding.lineEnd + MERGE_LINE_TOLERANCE,
+export function isSameIssue(a: IssueRegion, b: IssueRegion): boolean {
+  return (
+    a.category !== 'other' &&
+    a.path === b.path &&
+    mergeFamily(a.category) === mergeFamily(b.category) &&
+    a.lineStart <= b.lineEnd + MERGE_LINE_TOLERANCE &&
+    b.lineStart <= a.lineEnd + MERGE_LINE_TOLERANCE
   );
+}
+
+function isRestatement(finding: PreparedFinding, claimed: readonly ClaimedRegion[]): boolean {
+  return claimed.some((region) => isSameIssue(finding, region));
 }
 
 function placementFor(finding: PreparedFinding, inlineSlotsLeft: number): FindingPlacement {
@@ -131,6 +135,7 @@ export function classifyFindings(
     filtered: 0,
     duplicate: 0,
     merged: 0,
+    resolved: 0,
   };
   const toStore: NewFinding[] = [];
   // Regions of issues already accounted for this run: posted, already reported, or suppressed.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { QUEUE_JOB_OPTIONS, buildReviewJobId } from './jobs.js';
+import { QUEUE_JOB_OPTIONS, buildIndexJobId, buildReviewJobId } from './jobs.js';
 
 const HEAD_SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 
@@ -50,5 +50,14 @@ describe('QUEUE_JOB_OPTIONS', () => {
     expect(QUEUE_JOB_OPTIONS.review.attempts).toBe(3);
     expect(QUEUE_JOB_OPTIONS.index.attempts).toBe(3);
     expect(QUEUE_JOB_OPTIONS.ciSummary.attempts).toBe(2);
+  });
+});
+
+describe('buildIndexJobId', () => {
+  it('keys index jobs by repo and commit, with a fixed id for the first index', () => {
+    expect(buildIndexJobId({ githubRepoId: 7, commitSha: 'a'.repeat(40) })).toBe(
+      `7@${'a'.repeat(40)}`,
+    );
+    expect(buildIndexJobId({ githubRepoId: 7, commitSha: null })).toBe('7@initial');
   });
 });

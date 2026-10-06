@@ -6,11 +6,13 @@ import {
   type InstallationStatus,
 } from '@mergemind/shared';
 
+import type { IndexProducer } from '../../queues/index.producer.js';
 import type { HandlerResult } from './handler-result.js';
 
 export type InstallationHandlerDeps = {
   installations: InstallationsRepository;
   repositories: RepositoriesRepository;
+  indexProducer: IndexProducer;
 };
 
 type GithubInstallation = InstallationEvent['installation'];
@@ -32,6 +34,27 @@ function toInstallationStatus(action: InstallationEvent['action']): Installation
 
 function toRepositoryInput(repo: GithubInstallationRepo) {
   return { githubRepoId: repo.id, fullName: repo.full_name, isPrivate: repo.private };
+}
+
+/** First index of newly installed repos (PRD F6); the worker resolves the default branch. */
+async function enqueueInitialIndex(
+  installation: GithubInstallation,
+  repos: readonly GithubInstallationRepo[],
+  deps: InstallationHandlerDeps,
+): Promise<void> {
+  await Promise.all(
+    repos.map((repo) =>
+      deps.indexProducer.enqueue({
+        githubInstallationId: installation.id,
+        githubRepoId: repo.id,
+        repoFullName: repo.full_name,
+        isPrivate: repo.private,
+        defaultBranch: null,
+        commitSha: null,
+        trigger: 'installation',
+      }),
+    ),
+  );
 }
 
 async function upsertInstallation(
@@ -65,6 +88,9 @@ export async function handleInstallationEvent(
       installationId,
       event.repositories.map(toRepositoryInput),
     );
+    if (event.action === 'created') {
+      await enqueueInitialIndex(event.installation, event.repositories, deps);
+    }
   }
   return { status: 'handled', reason: `installation_${event.action}` };
 }
@@ -79,6 +105,7 @@ export async function handleInstallationRepositoriesEvent(
     installationId,
     event.repositories_added.map(toRepositoryInput),
   );
+  await enqueueInitialIndex(event.installation, event.repositories_added, deps);
   await deps.repositories.markUninstalled(event.repositories_removed.map((repo) => repo.id));
   return { status: 'handled', reason: `repositories_${event.action}` };
 }

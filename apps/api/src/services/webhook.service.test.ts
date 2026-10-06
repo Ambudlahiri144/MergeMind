@@ -36,6 +36,7 @@ function buildService(options: { claim?: DeliveryClaim; enqueue?: ReviewProducer
   const service = createWebhookService({
     deliveries,
     reviewProducer,
+    indexProducer: { enqueue: () => Promise.resolve('index-job'), close: () => Promise.resolve() },
     installations: {} as InstallationsRepository,
     repositories: {} as RepositoriesRepository,
     pullRequests: {} as PullRequestsRepository,

@@ -1,3 +1,4 @@
+import { CodeChunkModel } from './models/code-chunk.model.js';
 import { FindingModel } from './models/finding.model.js';
 import { InstallationModel } from './models/installation.model.js';
 import { PullRequestModel } from './models/pull-request.model.js';
@@ -16,6 +17,7 @@ const MODELS = [
   FindingModel,
   SuppressionModel,
   UsageLedgerModel,
+  CodeChunkModel,
 ];
 
 /**

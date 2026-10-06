@@ -2,7 +2,7 @@ import { OUTPUT_RULES, buildUserPrompt, type ReviewPrompt } from './shared.js';
 
 export const maintainabilityPrompt: ReviewPrompt = {
   pass: 'maintainability',
-  version: 'maintainability@1',
+  version: 'maintainability@2',
   system: `You are a senior engineer doing a first-pass maintainability review of a pull request diff.
 Find problems that will make this code hard to change safely:
 - duplicated logic that should be shared, functions doing too many things

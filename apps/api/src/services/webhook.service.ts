@@ -8,6 +8,7 @@ import {
   InstallationEventSchema,
   InstallationRepositoriesEventSchema,
   PullRequestEventSchema,
+  PushEventSchema,
   WebhookActionSchema,
   assertNever,
   isAppError,
@@ -15,6 +16,7 @@ import {
 } from '@mergemind/shared';
 import type { z } from 'zod';
 
+import type { IndexProducer } from '../queues/index.producer.js';
 import type { ReviewProducer } from '../queues/review.producer.js';
 import type { HandlerResult } from '../webhooks/handlers/handler-result.js';
 import {
@@ -25,6 +27,7 @@ import {
   handlePullRequestClosed,
   handlePullRequestReview,
 } from '../webhooks/handlers/pull-request.handler.js';
+import { handlePush } from '../webhooks/handlers/push.handler.js';
 import { routeWebhook, type WebhookRoute } from '../webhooks/route-webhook.js';
 
 const MAX_STORED_ERROR_LENGTH = 500;
@@ -35,6 +38,7 @@ export type WebhookServiceDeps = {
   repositories: RepositoriesRepository;
   pullRequests: PullRequestsRepository;
   reviewProducer: ReviewProducer;
+  indexProducer: IndexProducer;
 };
 
 export type IncomingWebhook = {
@@ -92,6 +96,8 @@ export function createWebhookService(deps: WebhookServiceDeps): WebhookService {
         );
       case 'pull_request_closed':
         return handlePullRequestClosed(parsePayload(PullRequestEventSchema, webhook), deps);
+      case 'push':
+        return handlePush(parsePayload(PushEventSchema, webhook), deps);
       case 'ignored':
         return { status: 'ignored', reason: route.reason };
       default:

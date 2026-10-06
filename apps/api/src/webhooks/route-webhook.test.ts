@@ -36,7 +36,11 @@ describe('routeWebhook', () => {
     expect(routeWebhook(event, action)).toEqual({ kind: 'ignored', reason: 'unsupported_action' });
   });
 
-  it.each(['push', 'workflow_run'])('ignores %s until its phase lands', (event) => {
+  it('routes push to the index handler', () => {
+    expect(routeWebhook('push', undefined)).toEqual({ kind: 'push' });
+  });
+
+  it.each(['workflow_run'])('ignores %s until its phase lands', (event) => {
     expect(routeWebhook(event, 'completed')).toEqual({
       kind: 'ignored',
       reason: 'not_yet_supported',

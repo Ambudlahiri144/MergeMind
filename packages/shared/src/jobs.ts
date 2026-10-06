@@ -49,6 +49,28 @@ export function buildReviewJobId({
   return attempt > 1 ? `${base}-a${attempt}` : base;
 }
 
+export const INDEX_TRIGGERS = ['push', 'installation'] as const;
+export type IndexTrigger = (typeof INDEX_TRIGGERS)[number];
+
+/** Data carried by an `index.repo` job (PRD F6). */
+export const IndexRepoJobDataSchema = z.object({
+  githubInstallationId: z.number().int().positive(),
+  githubRepoId: z.number().int().positive(),
+  repoFullName: z.string().min(1),
+  isPrivate: z.boolean(),
+  /** Known for pushes; installation payloads omit it, so the worker asks GitHub. */
+  defaultBranch: z.string().min(1).nullable(),
+  /** The pushed head, or null for the first index after installation. */
+  commitSha: GitShaSchema.nullable(),
+  trigger: z.enum(INDEX_TRIGGERS),
+});
+export type IndexRepoJobData = z.infer<typeof IndexRepoJobDataSchema>;
+
+/** `<githubRepoId>@<commitSha>`, or `<githubRepoId>@initial` for the first index (ADR-024). */
+export function buildIndexJobId(input: { githubRepoId: number; commitSha: string | null }): string {
+  return `${input.githubRepoId}@${input.commitSha ?? 'initial'}`;
+}
+
 const SECONDS_PER_DAY = 86_400;
 
 /**

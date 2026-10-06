@@ -38,7 +38,7 @@ function startInput(repositoryId: string, headSha: string) {
     baseSha: '0'.repeat(40),
     trigger: 'opened' as const,
     attempt: 1,
-    promptVersion: 'security@1+correctness@1+maintainability@1',
+    promptVersion: 'security@2+correctness@2+maintainability@2',
   };
 }
 
@@ -84,6 +84,7 @@ describe('reviewRuns', () => {
           filtered: 1,
           duplicate: 0,
           merged: 0,
+          resolved: 0,
         },
         failedPasses: ['maintainability'],
       },
@@ -100,6 +101,7 @@ describe('reviewRuns', () => {
         filtered: 1,
         duplicate: 0,
         merged: 0,
+        resolved: 0,
       },
       timings: { queuedMs: 5, fetchMs: 10, retrieveMs: 0, llmMs: 900, publishMs: 40, totalMs: 960 },
       isBudgetWarning: true,

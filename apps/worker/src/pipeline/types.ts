@@ -1,4 +1,5 @@
 import type {
+  CodeChunksRepository,
   FindingsRepository,
   InstallationsRepository,
   PullRequestsRepository,
@@ -8,7 +9,7 @@ import type {
   UsageLedgerRepository,
 } from '@mergemind/db';
 import type { GithubApp } from '@mergemind/github';
-import type { ReviewLlm } from '@mergemind/llm';
+import type { Embedder, ReviewLlm } from '@mergemind/llm';
 import type { GateConclusion, ReviewRunMode, SkipReason } from '@mergemind/shared';
 import type { Logger } from '@mergemind/shared/logger';
 
@@ -38,6 +39,9 @@ export type ReviewDeps = {
   findings: FindingsRepository;
   suppressions: SuppressionsRepository;
   usageLedger: UsageLedgerRepository;
+  /** Code index for retrieval context (PRD F6). */
+  codeChunks: CodeChunksRepository;
+  embedder: Embedder;
   github: GithubApp;
   llm: ReviewLlm;
   logger: Logger;

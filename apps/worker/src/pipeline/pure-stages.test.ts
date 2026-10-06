@@ -161,6 +161,7 @@ describe('classifyFindings', () => {
       filtered: 1,
       duplicate: 1,
       merged: 0,
+      resolved: 0,
     });
     expect(gateSeverities(counts)).toEqual([{ severity: 'critical' }]);
   });

@@ -26,6 +26,8 @@ export type RunCounts = {
   duplicate: number;
   /** Restatements of a kept finding from another pass, folded into it (ADR-021). */
   merged: number;
+  /** Earlier findings this push fixed (incremental review, ADR-023). */
+  resolved: number;
 };
 
 export type RunTokens = { input: number; output: number };
@@ -75,6 +77,7 @@ export const EMPTY_COUNTS: RunCounts = {
   filtered: 0,
   duplicate: 0,
   merged: 0,
+  resolved: 0,
 };
 export const EMPTY_TIMINGS: RunTimings = {
   queuedMs: 0,
@@ -94,6 +97,7 @@ const countsSchema = new Schema<RunCounts>(
     filtered: { type: Number, required: true },
     duplicate: { type: Number, required: true },
     merged: { type: Number, required: true, default: 0 },
+    resolved: { type: Number, required: true, default: 0 },
   },
   { _id: false },
 );

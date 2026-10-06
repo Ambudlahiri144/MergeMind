@@ -99,7 +99,7 @@ describe('createReviewLlm.reviewPass', () => {
     const result = await llm.reviewPass(input);
 
     expect(result.provider).toBe('groq');
-    expect(result.promptVersion).toBe('security@1');
+    expect(result.promptVersion).toBe('security@2');
     expect(result.findings).toEqual([
       expect.objectContaining({
         pass: 'security',
@@ -326,7 +326,7 @@ describe('CircuitBreaker', () => {
 describe('prompts', () => {
   it('joins pass versions for reviewRuns.promptVersion', () => {
     expect(promptVersionFor(['security', 'correctness', 'maintainability'])).toBe(
-      'security@1+correctness@1+maintainability@1',
+      'security@2+correctness@2+maintainability@2',
     );
   });
 
@@ -340,5 +340,38 @@ describe('prompts', () => {
         '   11 + const row = db.query(`... ${id}`);',
       ].join('\n'),
     );
+  });
+});
+
+describe('prompt context (PRD F6)', () => {
+  it('adds retrieved code as a read-only context block before the diff', async () => {
+    const groq = new MockLanguageModelV4({ doGenerate: textResult(VALID_OUTPUT) });
+
+    await createReviewLlm({ providers: [provider('groq', groq)] }).reviewPass({
+      ...input,
+      context: [
+        {
+          path: 'src/db.ts',
+          symbol: 'query',
+          startLine: 3,
+          endLine: 5,
+          content: 'export function query(sql: string) {}',
+        },
+      ],
+    });
+
+    const prompt = JSON.stringify(groq.doGenerateCalls[0]?.prompt);
+    expect(prompt).toContain('<context>');
+    expect(prompt).toContain('File: src/db.ts (query, lines 3-5)');
+    expect(prompt).toContain('do not report issues in it');
+    expect(prompt.indexOf('<context>')).toBeLessThan(prompt.indexOf('<diff>'));
+  });
+
+  it('omits the block when there is no context', async () => {
+    const groq = new MockLanguageModelV4({ doGenerate: textResult(VALID_OUTPUT) });
+
+    await createReviewLlm({ providers: [provider('groq', groq)] }).reviewPass(input);
+
+    expect(JSON.stringify(groq.doGenerateCalls[0]?.prompt)).not.toContain('<context>');
   });
 });

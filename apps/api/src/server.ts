@@ -14,6 +14,7 @@ import { Redis } from 'ioredis';
 
 import { createApp } from './app.js';
 import { loadApiEnv } from './config/env.js';
+import { createIndexProducer } from './queues/index.producer.js';
 import { createReviewProducer } from './queues/review.producer.js';
 import { createWebhookService } from './services/webhook.service.js';
 
@@ -29,12 +30,14 @@ async function main(): Promise<void> {
   });
 
   const reviewProducer = createReviewProducer({ connection: redis });
+  const indexProducer = createIndexProducer({ connection: redis });
   const webhookService = createWebhookService({
     deliveries: createWebhookDeliveriesRepository(),
     installations: createInstallationsRepository(),
     repositories: createRepositoriesRepository(),
     pullRequests: createPullRequestsRepository(),
     reviewProducer,
+    indexProducer,
   });
 
   const app = createApp({
@@ -74,6 +77,7 @@ async function main(): Promise<void> {
         }),
     },
     { name: 'review-queue', run: () => reviewProducer.close() },
+    { name: 'index-queue', run: () => indexProducer.close() },
     {
       name: 'redis',
       run: async () => {

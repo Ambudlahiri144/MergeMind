@@ -4,6 +4,7 @@ import {
   InstallationEventSchema,
   InstallationRepositoriesEventSchema,
   PullRequestEventSchema,
+  PushEventSchema,
   WebhookActionSchema,
 } from '../../src/index.js';
 import { loadGithubFixture } from '../../src/testing/index.js';
@@ -65,5 +66,19 @@ describe('GitHub webhook payload contracts', () => {
     pullRequest.head.sha = 'not-a-sha';
 
     expect(PullRequestEventSchema.safeParse(payload).success).toBe(false);
+  });
+});
+
+describe('push payload contract', () => {
+  it('push.default-branch parses with PushEventSchema (deleted defaults to false)', async () => {
+    const { payload } = await loadGithubFixture('push.default-branch');
+
+    const parsed = PushEventSchema.parse(payload);
+
+    expect(parsed).toMatchObject({
+      ref: 'refs/heads/main',
+      deleted: false,
+      repository: { default_branch: 'main' },
+    });
   });
 });

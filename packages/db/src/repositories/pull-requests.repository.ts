@@ -20,6 +20,8 @@ export type PullRequestInput = {
 export type PullRequestView = Omit<PullRequestInput, 'repositoryId'> & {
   id: string;
   repositoryId: string;
+  /** Head SHA of the last completed review: the base of an incremental review (F5). */
+  lastReviewedSha?: string;
 };
 
 export type PullRequestsRepository = {
@@ -70,6 +72,7 @@ export function createPullRequestsRepository(): PullRequestsRepository {
           state: 1,
           isDraft: 1,
           githubUpdatedAt: 1,
+          lastReviewedSha: 1,
         },
       ).lean();
       if (!doc) {
@@ -87,6 +90,7 @@ export function createPullRequestsRepository(): PullRequestsRepository {
         state: doc.state,
         isDraft: doc.isDraft,
         githubUpdatedAt: doc.githubUpdatedAt,
+        ...(doc.lastReviewedSha === undefined ? {} : { lastReviewedSha: doc.lastReviewedSha }),
       };
     },
 

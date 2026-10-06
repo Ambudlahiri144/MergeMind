@@ -53,6 +53,18 @@ export type FindingsRepository = {
     reviewRunId: string,
     comments: readonly { fingerprint: string; githubCommentId: number }[],
   ): Promise<void>;
+  /** Open findings of the PR from runs other than `excludeRunId` (resolution candidates). */
+  listOpenForPr(pullRequestId: string, excludeRunId: string): Promise<FindingView[]>;
+  /** Marks findings fixed by a push; only still-open ones change (idempotent, ADR-023). */
+  markResolved(
+    findingIds: readonly string[],
+    resolution: { sha: string; runId: string },
+  ): Promise<number>;
+  listResolvedByRun(reviewRunId: string): Promise<FindingView[]>;
+  /** Open findings on the PR by severity: the PR-wide gate input (ADR-023). */
+  countOpenBySeverity(
+    pullRequestId: string,
+  ): Promise<{ critical: number; major: number; minor: number }>;
 };
 
 type LeanFinding = FindingRecord & { _id: Types.ObjectId };
@@ -146,6 +158,59 @@ export function createFindingsRepository(): FindingsRepository {
         },
       }));
       await FindingModel.bulkWrite(operations, { ordered: false });
+    },
+
+    async listOpenForPr(pullRequestId, excludeRunId) {
+      const docs = await FindingModel.find(
+        {
+          pullRequestId: new Types.ObjectId(pullRequestId),
+          state: 'open',
+          reviewRunId: { $ne: new Types.ObjectId(excludeRunId) },
+        },
+        { createdAt: 0, updatedAt: 0, __v: 0 },
+      )
+        .limit(MAX_FINDINGS_PER_RUN)
+        .lean<LeanFinding[]>();
+      return docs.map(toView);
+    },
+
+    async markResolved(findingIds, { sha, runId }) {
+      if (findingIds.length === 0) {
+        return 0;
+      }
+      const result = await FindingModel.updateMany(
+        { _id: { $in: findingIds.map((id) => new Types.ObjectId(id)) }, state: 'open' },
+        {
+          $set: {
+            state: 'resolved',
+            resolvedInSha: sha,
+            resolvedByRunId: new Types.ObjectId(runId),
+          },
+        },
+      );
+      return result.modifiedCount;
+    },
+
+    async listResolvedByRun(reviewRunId) {
+      const docs = await FindingModel.find(
+        { resolvedByRunId: new Types.ObjectId(reviewRunId), state: 'resolved' },
+        { createdAt: 0, updatedAt: 0, __v: 0 },
+      )
+        .limit(MAX_FINDINGS_PER_RUN)
+        .lean<LeanFinding[]>();
+      return docs.map(toView);
+    },
+
+    async countOpenBySeverity(pullRequestId) {
+      const rows = await FindingModel.aggregate<{ _id: Severity; count: number }>([
+        { $match: { pullRequestId: new Types.ObjectId(pullRequestId), state: 'open' } },
+        { $group: { _id: '$severity', count: { $sum: 1 } } },
+      ]);
+      const counts = { critical: 0, major: 0, minor: 0 };
+      for (const row of rows) {
+        counts[row._id] = row.count;
+      }
+      return counts;
     },
   };
 }

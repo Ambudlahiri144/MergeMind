@@ -1,5 +1,6 @@
 import {
   EMPTY_REVIEW_COUNTS,
+  type CodeChunkHit,
   type FindingView,
   type ReviewRunView,
   type RunCounts,
@@ -10,9 +11,11 @@ import {
   commentableLines,
   countChangedLines,
   extractFingerprint,
+  extractResolvedFingerprint,
   renderCheckOutput,
   renderInlineComment,
   renderNoticeBody,
+  renderResolvedReply,
   renderReviewBody,
   runMarker,
   toFileDiff,
@@ -21,7 +24,8 @@ import {
   type GithubInstallationClient,
   type InlineComment,
 } from '@mergemind/github';
-import { promptVersionFor } from '@mergemind/llm';
+import { isProviderAllowed, promptVersionFor, type ContextSnippet } from '@mergemind/llm';
+import pLimit from 'p-limit';
 import {
   DEFAULT_POLICY,
   POLICY_FILE_PATH,
@@ -39,9 +43,23 @@ import {
 } from '@mergemind/shared';
 import type { Logger } from '@mergemind/shared/logger';
 
-import { chunkFiles } from './chunk-hunks.js';
+import { chunkFiles, type ReviewChunk } from './chunk-hunks.js';
+import {
+  COMPARE_FALLBACK_REASONS,
+  changedHeadLines,
+  countHunkChanges,
+  findResolvedFindings,
+  scopeToChanges,
+} from './incremental.js';
 import { decideSkip, loadBaseContext, loadPolicy, type BaseContext } from './load-context.js';
 import { classifyFindings, gateSeverities, prepareFindings } from './post-process.js';
+import {
+  NAME_RESULTS,
+  VECTOR_RESULTS,
+  extractCalledNames,
+  queryTextFor,
+  selectContext,
+} from './retrieve-context.js';
 import { runPasses } from './run-passes.js';
 import {
   ReviewRetryableError,
@@ -51,6 +69,8 @@ import {
 } from './types.js';
 
 const MAX_LISTED_FILES = 10;
+const SHORT_SHA_LENGTH = 7;
+const RETRIEVAL_CONCURRENCY = 3;
 const PERCENT = 100;
 
 /** Mutable state of one run while it executes. */
@@ -66,7 +86,13 @@ type Session = {
   checkRunId: number | null;
   notes: string[];
   isBudgetWarning: boolean;
-  timings: { queuedMs: number; fetchMs: number; llmMs: number; publishMs: number };
+  timings: {
+    queuedMs: number;
+    fetchMs: number;
+    retrieveMs: number;
+    llmMs: number;
+    publishMs: number;
+  };
 };
 
 type FinishInput = {
@@ -141,7 +167,6 @@ async function finish(session: Session, input: FinishInput): Promise<ReviewOutco
   }
   const timings = {
     ...session.timings,
-    retrieveMs: 0,
     totalMs: elapsedSince(deps, session.startedAtMs),
   };
   await deps.reviewRuns.complete(run.id, {
@@ -192,17 +217,135 @@ async function postReviewOnce(
 
 type Analysis = { counts: RunCounts; failedPasses: ReviewPass[]; tokens: RunTokens };
 
-async function analyze(
+/** What this run sends to the LLM (ADR-023). */
+type ReviewScope = {
+  mode: 'full' | 'incremental';
+  /** PR-diff files (scoped hunks only, for incremental) reviewed by the passes. */
+  files: FileDiff[];
+  /** lastReviewedSha...head diff; empty for a full review. */
+  compareFiles: FileDiff[];
+};
+
+/** Stage 6b: incremental when this is a push after a completed review and GitHub can compare. */
+async function decideScope(
   session: Session,
   reviewable: readonly FileDiff[],
+): Promise<ReviewScope> {
+  const { base, client } = session;
+  const lastReviewedSha = base.pullRequest.lastReviewedSha;
+  const full = (reason?: string): ReviewScope => {
+    if (reason !== undefined) {
+      session.notes.push(`Full review: ${reason}.`);
+    }
+    return { mode: 'full', files: [...reviewable], compareFiles: [] };
+  };
+  if (
+    base.data.trigger !== 'synchronize' ||
+    lastReviewedSha === undefined ||
+    lastReviewedSha === base.data.headSha
+  ) {
+    return full();
+  }
+  const compare = await client.compareCommits({
+    ...base.repoRef,
+    base: lastReviewedSha,
+    head: base.data.headSha,
+  });
+  if (compare === null) {
+    return full(COMPARE_FALLBACK_REASONS.unavailable);
+  }
+  if (compare.status !== 'ahead') {
+    return full(COMPARE_FALLBACK_REASONS.notAhead);
+  }
+  if (compare.isTruncated) {
+    return full(COMPARE_FALLBACK_REASONS.truncated);
+  }
+  const compareFiles = compare.files.map(toFileDiff);
+  const files = scopeToChanges(reviewable, changedHeadLines(compareFiles));
+  session.notes.push(
+    `Incremental review: re-reviewed ${files.length} file${files.length === 1 ? '' : 's'} changed since \`${lastReviewedSha.slice(0, SHORT_SHA_LENGTH)}\`.`,
+  );
+  return { mode: 'incremental', files, compareFiles };
+}
+
+/**
+ * Stage 8: related repository code per review chunk (PRD F6, ADR-025). Optional: an index that is
+ * not ready, a disallowed embedding provider, or a failing vector search all mean "no context".
+ */
+async function retrieveContexts(
+  session: Session,
+  chunks: readonly ReviewChunk[],
+): Promise<ContextSnippet[][]> {
+  const { base, deps } = session;
+  const none = chunks.map((): ContextSnippet[] => []);
+  const isAllowed = isProviderAllowed('ollama', {
+    isPrivateRepo: base.repository.isPrivate,
+    allowedProviders: base.installation.allowedProviders,
+  });
+  if (base.repository.indexStatus !== 'ready' || !isAllowed || chunks.length === 0) {
+    return none;
+  }
+  const limit = pLimit(RETRIEVAL_CONCURRENCY);
+  // Each source degrades on its own: no vector index (or Ollama down) still leaves name lookups.
+  let vectorError: unknown;
+  const searchSimilar = async (query: string): Promise<CodeChunkHit[]> => {
+    if (query === '' || vectorError !== undefined) {
+      return [];
+    }
+    try {
+      const { embedding } = await deps.embedder.embedQuery(query);
+      return await deps.codeChunks.vectorSearch(base.repository.id, embedding, VECTOR_RESULTS);
+    } catch (error) {
+      vectorError = error;
+      return [];
+    }
+  };
+  try {
+    const contexts = await Promise.all(
+      chunks.map((chunk) =>
+        limit(async () => {
+          const [vectorHits, nameHits] = await Promise.all([
+            searchSimilar(queryTextFor(chunk)),
+            deps.codeChunks.findByNames(
+              base.repository.id,
+              extractCalledNames(chunk),
+              NAME_RESULTS,
+            ),
+          ]);
+          return selectContext(chunk, nameHits, vectorHits);
+        }),
+      ),
+    );
+    if (vectorError !== undefined) {
+      session.log.warn({ err: vectorError }, 'review.vectorSearchUnavailable');
+    }
+    session.log.info(
+      { snippets: contexts.reduce((total, context) => total + context.length, 0) },
+      'review.contextRetrieved',
+    );
+    return contexts;
+  } catch (error) {
+    session.log.warn({ err: error }, 'review.contextUnavailable');
+    return none;
+  }
+}
+
+async function analyze(
+  session: Session,
+  scope: ReviewScope,
   filesByPath: ReadonlyMap<string, FileDiff>,
 ): Promise<Analysis | 'all_failed'> {
   const { base, deps, policy, run } = session;
+  const chunks = chunkFiles(scope.files, deps.config.chunkTokens);
+  const retrieveStartedAt = deps.now().getTime();
+  const contexts = await retrieveContexts(session, chunks);
+  session.timings.retrieveMs = elapsedSince(deps, retrieveStartedAt);
   const llmStartedAt = deps.now().getTime();
   const result = await runPasses(deps.llm, {
     runId: run.id,
     passes: policy.policy.review.passes,
-    chunks: chunkFiles(reviewable, deps.config.chunkTokens),
+    chunks,
+    contexts,
     persona: policy.policy.persona,
     isPrivateRepo: base.repository.isPrivate,
     allowedProviders: base.installation.allowedProviders,
@@ -248,6 +391,23 @@ async function analyze(
     { reviewRunId: run.id, pullRequestId: base.pullRequest.id, repositoryId: base.repository.id },
     toStore,
   );
+
+  // Stage 11b: earlier findings this push fixed (incremental only; ADR-023).
+  if (scope.mode === 'incremental') {
+    const minConfidence = policy.policy.review.minConfidence;
+    const resolved = findResolvedFindings({
+      openFindings: await deps.findings.listOpenForPr(base.pullRequest.id, run.id),
+      compareFiles: scope.compareFiles,
+      currentIssues: prepared.filter((finding) => finding.confidence >= minConfidence),
+    });
+    counts.resolved = await deps.findings.markResolved(
+      resolved.map((finding) => finding.id),
+      { sha: base.data.headSha, runId: run.id },
+    );
+  }
+  // The gate covers every open finding on the PR, not just this run's (ADR-023).
+  Object.assign(counts, await deps.findings.countOpenBySeverity(base.pullRequest.id));
+
   const tokens = result.calls.reduce(
     (total, call) => ({
       input: total.input + call.inputTokens,
@@ -256,8 +416,41 @@ async function analyze(
     { input: 0, output: 0 },
   );
   const analysis: Analysis = { counts, failedPasses: result.failedPasses, tokens };
-  await deps.reviewRuns.markAnalyzed(run.id, { mode: 'full', ...analysis }, deps.now());
+  await deps.reviewRuns.markAnalyzed(run.id, { mode: scope.mode, ...analysis }, deps.now());
   return analysis;
+}
+
+/**
+ * Replies "Resolved in <sha>" on each finding this run resolved, once (reply marker), then
+ * resolves their threads when GitHub allows it (Contents: write; ADR-023).
+ */
+async function publishResolutions(session: Session): Promise<void> {
+  const { base, client, deps, run } = session;
+  const resolved = (await deps.findings.listResolvedByRun(run.id)).filter(
+    (finding) => finding.githubCommentId !== undefined,
+  );
+  if (resolved.length === 0) {
+    return;
+  }
+  const pullRef = { ...base.repoRef, pullNumber: base.data.prNumber };
+  const existing = await client.listPullRequestComments(pullRef);
+  const replied = new Set(existing.map((comment) => extractResolvedFingerprint(comment.body)));
+  for (const finding of resolved) {
+    if (!replied.has(finding.fingerprint)) {
+      await client.replyToReviewComment({
+        ...pullRef,
+        commentId: finding.githubCommentId ?? 0,
+        body: renderResolvedReply(finding.fingerprint, base.data.headSha),
+      });
+    }
+  }
+  const threads = await client.resolveReviewThreads({
+    ...pullRef,
+    commentIds: resolved.map((finding) => finding.githubCommentId ?? 0),
+  });
+  if (threads.isPermissionDenied) {
+    session.log.info({ count: resolved.length }, 'review.threadResolveUnavailable');
+  }
 }
 
 function splitPlacement(
@@ -324,6 +517,7 @@ async function publish(
       }),
     );
   }
+  await publishResolutions(session);
   session.timings.publishMs = elapsedSince(deps, publishStartedAt);
 }
 
@@ -392,9 +586,13 @@ async function reviewWithCheckRun(session: Session): Promise<ReviewOutcome> {
     });
   }
 
+  // Stage 6b: incremental scope (only hunks changed since the last review).
+  const scope = await decideScope(session, reviewable);
+
   // Stage 6: size gate → summary_only, no LLM calls.
-  const changedLines = countChangedLines(reviewable);
-  const chunkCount = chunkFiles(reviewable, deps.config.chunkTokens).length;
+  const changedLines =
+    scope.mode === 'incremental' ? countHunkChanges(scope.files) : countChangedLines(reviewable);
+  const chunkCount = chunkFiles(scope.files, deps.config.chunkTokens).length;
   if (changedLines > reviewPolicy.maxChangedLines || chunkCount > deps.config.maxChunksPerRun) {
     const notice = `This PR changes ${changedLines.toLocaleString('en-US')} lines in ${reviewable.length} files, above the review limit (${reviewPolicy.maxChangedLines.toLocaleString('en-US')} changed lines), so MergeMind skipped the line-by-line review. Split the PR, or raise \`review.maxChangedLines\` in \`${POLICY_FILE_PATH}\`.`;
     if (run.githubReviewId === undefined) {
@@ -409,10 +607,12 @@ async function reviewWithCheckRun(session: Session): Promise<ReviewOutcome> {
   }
 
   // Stages 7-11: chunk, passes, post-process, reconcile (skipped when resuming).
+  // Anchoring always uses the full PR diff, even when only some hunks were reviewed.
   const filesByPath = new Map(reviewable.map((file) => [file.path, file]));
   let analysis: Analysis;
+  let mode: ReviewRunMode = scope.mode;
   if (run.analyzedAt === undefined) {
-    const analyzed = await analyze(session, reviewable, filesByPath);
+    const analyzed = await analyze(session, scope, filesByPath);
     if (analyzed === 'all_failed') {
       if (!session.meta.isFinalAttempt) {
         throw new ReviewRetryableError('No LLM provider could review this PR');
@@ -420,14 +620,20 @@ async function reviewWithCheckRun(session: Session): Promise<ReviewOutcome> {
       session.notes.push('No LLM provider could review this PR after several attempts.');
       return finish(session, {
         conclusion: 'neutral',
-        mode: 'full',
+        mode: scope.mode,
         headline: 'Review unavailable: no LLM provider responded',
       });
     }
     analysis = analyzed;
   } else {
     analysis = { counts: run.counts, failedPasses: run.failedPasses, tokens: run.tokens };
+    mode = run.mode;
     session.timings.llmMs = run.timings.llmMs;
+  }
+  if (analysis.counts.resolved > 0) {
+    session.notes.push(
+      `Resolved ${analysis.counts.resolved} earlier finding${analysis.counts.resolved === 1 ? '' : 's'} fixed by this push.`,
+    );
   }
   if (analysis.failedPasses.length > 0) {
     session.notes.push(
@@ -447,7 +653,7 @@ async function reviewWithCheckRun(session: Session): Promise<ReviewOutcome> {
   }
   await publish(session, analysis, filesByPath);
   const conclusion = evaluateGate(policy.policy.gate.failOn, gateSeverities(analysis.counts));
-  const outcome = await finish(session, { conclusion, mode: 'full', counts: analysis.counts });
+  const outcome = await finish(session, { conclusion, mode, counts: analysis.counts });
   await deps.pullRequests.setLastReviewedSha(
     base.repository.id,
     base.data.prNumber,
@@ -540,6 +746,7 @@ export async function runReview(
     timings: {
       queuedMs: Math.max(0, startedAtMs - meta.enqueuedAt),
       fetchMs: 0,
+      retrieveMs: 0,
       llmMs: 0,
       publishMs: 0,
     },

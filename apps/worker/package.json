@@ -17,6 +17,12 @@
     "bullmq": "^6.3.11",
     "ioredis": "^6.0.0",
     "p-limit": "^7.3.3",
+    "tree-sitter-go": "0.25.0",
+    "tree-sitter-java": "0.23.5",
+    "tree-sitter-javascript": "0.25.0",
+    "tree-sitter-python": "0.25.0",
+    "tree-sitter-typescript": "0.23.2",
+    "web-tree-sitter": "0.27.0",
     "zod": "^4.6.5"
   }
 }

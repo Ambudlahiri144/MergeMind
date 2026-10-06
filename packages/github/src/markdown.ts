@@ -201,3 +201,19 @@ export function renderNoticeBody(
   sections.push(runMarker(runId));
   return sections.join('\n\n');
 }
+
+const RESOLVED_MARKER_PATTERN = /<!-- mergemind:resolved=([a-f0-9]{64}) -->/;
+
+/** Marker on a "resolved" reply; finding it again prevents a second reply (ADR-023). */
+export function resolvedMarker(fingerprint: string): string {
+  return `<!-- mergemind:resolved=${fingerprint} -->`;
+}
+
+export function extractResolvedFingerprint(body: string | null | undefined): string | null {
+  return RESOLVED_MARKER_PATTERN.exec(body ?? '')?.[1] ?? null;
+}
+
+/** Reply posted on a finding's comment when a later push fixed it. */
+export function renderResolvedReply(fingerprint: string, headSha: string): string {
+  return `Resolved in \`${headSha.slice(0, SHORT_SHA_LENGTH)}\`: this code changed and MergeMind no longer reports the issue.\n\n${resolvedMarker(fingerprint)}`;
+}

@@ -12,8 +12,8 @@ const REVIEW_TRIGGER_ACTIONS: ReadonlySet<string> = new Set<ReviewTrigger>([
   'ready_for_review',
 ]);
 
-/** Events in Architecture.md §5 that later phases handle (push → Phase 4, workflow_run → Phase 5). */
-const NOT_YET_SUPPORTED_EVENTS: ReadonlySet<string> = new Set(['push', 'workflow_run']);
+/** Events in Architecture.md §5 that later phases handle (workflow_run → Phase 5). */
+const NOT_YET_SUPPORTED_EVENTS: ReadonlySet<string> = new Set(['workflow_run']);
 
 export type IgnoreReason = 'unsupported_event' | 'unsupported_action' | 'not_yet_supported';
 
@@ -22,6 +22,7 @@ export type WebhookRoute =
   | { kind: 'installation_repositories' }
   | { kind: 'pull_request_review'; trigger: ReviewTrigger }
   | { kind: 'pull_request_closed' }
+  | { kind: 'push' }
   | { kind: 'ignored'; reason: IgnoreReason };
 
 function isOneOf(values: readonly string[], action: string | undefined): boolean {
@@ -46,6 +47,9 @@ export function routeWebhook(event: string, action: string | undefined): Webhook
       return action === 'closed'
         ? { kind: 'pull_request_closed' }
         : { kind: 'ignored', reason: 'unsupported_action' };
+    case 'push':
+      // The handler keeps only default-branch pushes (it needs the payload to tell).
+      return { kind: 'push' };
     default:
       return {
         kind: 'ignored',

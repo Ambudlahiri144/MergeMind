@@ -42,12 +42,16 @@ worker (queue: review, job: review.pr)
   3. createCheckRun   mergemind/review → in_progress
   4. fetchDiff        files + patches; drop ignorePaths; compute changed lines
   5. sizeGate         > maxChangedLines → summary-only mode
-  6. scopeIncremental if previous run exists: only hunks changed since lastReviewedSha
+  6. scopeIncremental push after a completed review: compare lastReviewedSha...head; only PR-diff
+                     hunks with a changed line go to the LLM (anchoring still uses the full PR diff).
+                     Force-push / 404 / not ahead / 300+ files: full review (ADR-023)
   7. chunkHunks       hunk groups ≤ token budget per LLM call
-  8. retrieveContext  $vectorSearch on codeChunks + symbol lookup (top-k)   [Phase 4; no-op until then]
+  8. retrieveContext  repo indexed: definitions of called names + $vectorSearch top-8 per chunk,
+                     own hunks dropped, ~1,500-token budget; any failure means no context (ADR-025)
   9. runPasses        security | correctness | maintainability (parallel, p-limit)
  10. postProcess      Zod-validate → fingerprint → dedupe → suppressions → minConfidence
- 11. reconcile        vs previous run: skip already-posted (Phase 3); resolve fixed (Phase 4)
+ 11. reconcile        skip already-posted; incremental: resolve earlier findings whose code changed
+                     and that nothing restates (reply "Resolved in <sha>", best-effort thread resolve)
  12. publish          ONE PR review with inline comments + summary; complete check run
                      (crash-safe: an existing review carrying the run marker is adopted, ADR-018)
  13. recordUsage      usageLedger rows per LLM call; emit review.completed
@@ -172,7 +176,7 @@ Indexes: `{ githubInstallationId: 1 }` unique.
 | isInstalled | boolean | false once removed from the installation or the app is uninstalled (PRD F1) |
 | isEnabled | boolean | toggled from UI; reviews need `isInstalled && isEnabled` |
 | indexStatus | `'none' \| 'indexing' \| 'ready' \| 'failed'` | |
-| lastIndexedSha | string? | |
+| lastIndexedSha | string? | head of the last completed index (base of the next incremental index) |
 
 Indexes: `{ githubRepoId: 1 }` unique, `{ installationId: 1, fullName: 1 }`.
 
@@ -201,7 +205,7 @@ Indexes: `{ repositoryId: 1, number: 1 }` unique, `{ repositoryId: 1, state: 1, 
 | skipReason | string? | `budget_exhausted`, `draft`, `disabled`, ... |
 | checkRunId | number? | GitHub check run |
 | gateConclusion | `'success' \| 'failure' \| 'neutral'`? | |
-| counts | `{ critical, major, minor, suppressed, filtered, duplicate }` | severity counts cover every open finding still present (new + already reported); `duplicate` = already reported by an earlier run |
+| counts | `{ critical, major, minor, suppressed, filtered, duplicate, merged, resolved }` | severity counts = every open finding on the **PR** after this run (the gate input, ADR-023); `duplicate` = already reported earlier; `merged` = cross-pass restatements (ADR-021); `resolved` = earlier findings this push fixed |
 | tokens | `{ input, output }` | |
 | timings | `{ queuedMs, fetchMs, retrieveMs, llmMs, publishMs, totalMs }` | |
 | promptVersion | string | the passes run, e.g. `security@1+correctness@1+maintainability@1` |
@@ -229,23 +233,28 @@ Indexes: `{ pullRequestId: 1, createdAt: -1 }`, `{ repositoryId: 1, headSha: 1, 
 | fingerprint | string | sha256(pass + path + normalized code + title-slug) |
 | state | `'open' \| 'resolved' \| 'dismissed' \| 'filtered'` | |
 | githubCommentId | number? | set after publishing |
+| resolvedInSha, resolvedByRunId | string?, ObjectId? | set when an incremental review finds the push fixed it (ADR-023) |
 | category | `FINDING_CATEGORIES` | injection, hardcoded-secret, missing-await, ..., other (eval matching) |
 | placement | `inline | summary` | inline = review comment; summary = listed in the review body (ADR-020) |
 
-Indexes: `{ pullRequestId: 1, fingerprint: 1 }` unique, `{ reviewRunId: 1, severity: 1 }`.
+Indexes: `{ pullRequestId: 1, fingerprint: 1 }` unique, `{ reviewRunId: 1, severity: 1 }`, `{ pullRequestId: 1, state: 1 }` (PR-wide gate and resolution candidates).
 
 ### `codeChunks`
 | Field | Type | Notes |
 |---|---|---|
 | repositoryId | ObjectId | |
-| path, symbol, kind | string | kind: `function \| class \| method \| module` |
+| path, symbol | string | `symbol` is qualified and unique per file (`UserService.save`, `save#2`, `lines:1-60`) |
+| name | string | last segment of `symbol`, for definition lookup by called name |
+| kind | string | `function \| class \| method \| interface \| type \| module \| window` |
+| language | string | tree-sitter grammar (`typescript`, `tsx`, `javascript`, `python`, `go`, `java`) or the extension for window-only files |
 | startLine, endLine | number | |
 | contentHash | string | skip re-embed if unchanged |
 | content | string | capped at ~1,500 tokens |
-| embedding | number[768] | nomic-embed-text |
+| embedding | number[768] | nomic-embed-text (`search_document:` prefix) |
+| embeddingModel | string | model that produced `embedding` |
 | commitSha | string | |
 
-Indexes: `{ repositoryId: 1, path: 1, symbol: 1 }` unique. **Atlas Vector Search index** `code_chunks_vector`: `embedding` (768, cosine) with filter field `repositoryId`. (M0 allows max 3 search indexes; this uses 1.)
+Indexes: `{ repositoryId: 1, path: 1, symbol: 1 }` unique, `{ repositoryId: 1, name: 1 }`. Created by the worker at boot (`ensureVectorSearchIndex`, non-fatal; create it in the Atlas UI if the driver call is refused). **Atlas Vector Search index** `code_chunks_vector`: `embedding` (768, cosine) with filter field `repositoryId`. (M0 allows max 3 search indexes; this uses 1.)
 
 ### `suppressions`
 `{ repositoryId, fingerprint, reason?, createdByLogin }`. Index: `{ repositoryId: 1, fingerprint: 1 }` unique.
@@ -303,7 +312,7 @@ Indexes: `{ repositoryId: 1, path: 1, symbol: 1 }` unique. **Atlas Vector Search
 | `installation_repositories` | added, removed | upsert repos, or mark removed ones `isInstalled: false` (`handled`) |
 | `pull_request` | opened, reopened, synchronize, ready_for_review | enqueue `review.pr` |
 | `pull_request` | closed | update PR state; cancel queued review for that PR |
-| `push` | (default branch only) | enqueue `index.repo` (Phase 4; until then `ignored`, reason `not_yet_supported`) |
+| `push` | default branch, not deleted | enqueue `index.repo`; other branches `ignored` (`not_default_branch`) |
 | `workflow_run` | completed + conclusion failure + linked PR | enqueue `ci-summary.run` (Phase 5; until then `ignored`) |
 | anything else | | `webhookDeliveries.status = ignored` |
 
@@ -311,7 +320,7 @@ Indexes: `{ repositoryId: 1, path: 1, symbol: 1 }` unique. **Atlas Vector Search
 | Queue | Job name | jobId | Attempts | Backoff |
 |---|---|---|---|---|
 | `review` | `review.pr` | `<githubRepoId>#<prNumber>@<headSha>` (`ready_for_review` appends `-ready`, manual rerun appends `-a<attempt>`; BullMQ forbids `:`, ADR-017/018) | 3 | exponential 10 s, jitter |
-| `index` | `index.repo` | `<repoId>@<commitSha>` | 3 | exponential 30 s |
+| `index` | `index.repo` | `<githubRepoId>@<commitSha>`, or `@initial` for the first index after installation | 3 | exponential 30 s |
 | `ci-summary` | `ci-summary.run` | `<repoId>#run<workflowRunId>` | 2 | exponential 15 s |
 
 Concurrency: `review` 4, `index` 1, `ci-summary` 2 (tunable by env).
@@ -339,9 +348,10 @@ Retention (`QUEUE_JOB_OPTIONS` in `@mergemind/shared`): completed jobs are kept 
   Providers: `createGroq` (`@ai-sdk/groq`), `createGoogle` (`@ai-sdk/google`), `createOllama` (`ai-sdk-ollama`). A provider without its key is left out of the chain.
 - **Fallback triggers:** any provider error (429, 5xx, timeout `LLM_TIMEOUT_MS` default 45 s, network), or schema validation failure after 1 repair re-ask on the same provider. All providers failing on every chunk → the job retries (BullMQ backoff); on the last attempt the check closes `neutral`.
 - **Circuit breaker:** after 3 consecutive failures, a provider opens for 60 s.
-- **Prompts:** `packages/llm/src/prompts/<pass>.prompt.ts` export `{ version, system, buildUser(input) }`. The version is stored on every run.
+- **Prompts:** `packages/llm/src/prompts/<pass>.prompt.ts` export `{ version, system, buildUser(input) }` (currently `@2`: optional `<context>` block of retrieved code, for reference only). The version is stored on every run.
 - **Determinism:** `temperature: 0` for review passes.
-- **Embeddings:** Ollama `nomic-embed-text` (768 dims), batched 32 per call.
+- **Embeddings:** Ollama `nomic-embed-text` (768 dims) only, so private code stays local. Batched 32 per call, 30 s timeout. Inputs carry the required prefixes: `search_document:` for chunks, `search_query:` for review queries. Vectors of any other size are rejected.
+- **Code index:** `index.repo` chunks the default branch by symbol with tree-sitter (WASM; TS, TSX, JS, Python, Go, Java) and falls back to 60-line windows. Unchanged content hashes are not re-embedded. Caps: 1,500 files, 200 KB per file, 6,000 chunks per repo (ADR-024).
 - **Tracing:** every call records a `usageLedger` row and goes to an `LlmTracer`. With `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` set, that tracer is the Langfuse SDK v5 adapter (`packages/llm/src/langfuse-tracer.ts`, ADR-022). It sends one `generation` per call (model, prompt version, usage, latency, outcome as level) with `session.id = runId`, so one review run is one Langfuse session. For private repos with `LANGFUSE_REDACT_INPUTS=true` (default) only metadata is sent, never prompts, code or output. The worker flushes it on shutdown.
 
 ### `.mergemind.yml` schema (v1)
@@ -376,7 +386,7 @@ persona: "Senior backend reviewer. Concise. Cite exact lines."
 | Webhook proxy | `npx -p smee-client smee -u $SMEE_URL -t http://localhost:4000/webhooks/github` | |
 
 ### Environment variables (see `.env.example`)
-`NODE_ENV`, `LOG_LEVEL`, `API_PORT` (default 4000), `MONGO_HOST_PORT` / `REDIS_HOST_PORT` (docker compose host ports, default 27017 / 6379), `MONGODB_URI`, `REDIS_URL`, `REVIEW_CONCURRENCY` / `INDEX_CONCURRENCY` / `CI_SUMMARY_CONCURRENCY` (worker, defaults 4 / 1 / 2), `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (PEM, `\n`-escaped), `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `AUTH_SECRET`, `API_JWT_SECRET`, `API_BASE_URL`, `GROQ_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OLLAMA_BASE_URL`, `LLM_PRIMARY_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_LOCAL_MODEL`, `LLM_TIMEOUT_MS`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`, `LANGFUSE_REDACT_INPUTS`, `SMEE_URL`.
+`NODE_ENV`, `LOG_LEVEL`, `API_PORT` (default 4000), `MONGO_HOST_PORT` / `REDIS_HOST_PORT` (docker compose host ports, default 27017 / 6379), `MONGODB_URI`, `REDIS_URL`, `REVIEW_CONCURRENCY` / `INDEX_CONCURRENCY` / `CI_SUMMARY_CONCURRENCY` (worker, defaults 4 / 1 / 2), `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (PEM, `\n`-escaped), `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `AUTH_SECRET`, `API_JWT_SECRET`, `API_BASE_URL`, `GROQ_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OLLAMA_BASE_URL`, `LLM_PRIMARY_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_LOCAL_MODEL`, `LLM_TIMEOUT_MS`, `EMBEDDING_MODEL` (default `nomic-embed-text`), `INDEX_MAX_FILES` / `INDEX_MAX_FILE_BYTES` (defaults 1,500 / 200,000), `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`, `LANGFUSE_REDACT_INPUTS`, `SMEE_URL`.
 
 ---
 

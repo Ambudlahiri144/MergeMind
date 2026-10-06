@@ -17,6 +17,7 @@ const app = createGithubApp({
   privateKey: createTestPrivateKey(),
   logger: createLogger({ name: 'test', level: 'silent' }),
   retries: 0,
+  isThrottled: false,
 });
 
 let client: GithubInstallationClient;
@@ -161,5 +162,103 @@ describe('reviews', () => {
         comments: [{ path: 'src/a.ts', line: 99, body: 'off the diff' }],
       }),
     ).rejects.toThrow(/HTTP 422/);
+  });
+});
+
+describe('incremental review and indexing endpoints', () => {
+  const file = {
+    filename: 'src/a.ts',
+    status: 'modified',
+    additions: 1,
+    deletions: 0,
+    patch: PATCH,
+  };
+
+  it('compares two commits and flags a possibly truncated file list', async () => {
+    fake.compares.set('octo-demo/payments-api:aaa...bbb', { status: 'ahead', files: [file] });
+    fake.compares.set('octo-demo/payments-api:aaa...ccc', {
+      status: 'ahead',
+      files: Array.from({ length: 300 }, (_, index) => ({ ...file, filename: `f${index}.ts` })),
+    });
+
+    const small = await client.compareCommits({ ...repo, base: 'aaa', head: 'bbb' });
+    const huge = await client.compareCommits({ ...repo, base: 'aaa', head: 'ccc' });
+
+    expect(small).toEqual({
+      status: 'ahead',
+      files: [expect.objectContaining({ filename: 'src/a.ts', patch: PATCH })],
+      isTruncated: false,
+    });
+    expect(huge?.isTruncated).toBe(true);
+  });
+
+  it('returns null when GitHub cannot compare (force-push, garbage-collected SHA)', async () => {
+    expect(await client.compareCommits({ ...repo, base: 'gone', head: 'bbb' })).toBeNull();
+  });
+
+  it('reads the branch head, its recursive tree and blob text', async () => {
+    fake.branches.set('octo-demo/payments-api:main', { sha: 'head1', treeSha: 'tree1' });
+    fake.trees.set('octo-demo/payments-api:tree1', {
+      entries: [{ path: 'src/a.ts', sha: 'blob1', size: 12 }],
+      truncated: false,
+    });
+    fake.blobs.set('octo-demo/payments-api:blob1', 'export const a = 1;\n');
+
+    const head = await client.getBranchHead({ ...repo, branch: 'main' });
+    const tree = await client.getTree({ ...repo, treeSha: head.treeSha });
+    const text = await client.getBlobText({ ...repo, sha: tree.entries[0]?.sha ?? '' });
+
+    expect(head).toEqual({ sha: 'head1', treeSha: 'tree1' });
+    expect(tree).toEqual({
+      entries: [{ path: 'src/a.ts', sha: 'blob1', size: 12 }],
+      isTruncated: false,
+    });
+    expect(text).toBe('export const a = 1;\n');
+  });
+
+  it('replies to a review comment and lists it with in_reply_to', async () => {
+    fake.pullRequestFiles.set('octo-demo/payments-api#42', [file]);
+    const reviewId = await client.createReview({
+      ...repo,
+      pullNumber: 42,
+      commitId: 'abc',
+      body: 'x',
+      comments: [{ path: 'src/a.ts', line: 2, body: 'inline' }],
+    });
+    const [comment] = await client.listReviewComments({ ...repo, pullNumber: 42, reviewId });
+
+    const replyId = await client.replyToReviewComment({
+      ...repo,
+      pullNumber: 42,
+      commentId: comment?.id ?? 0,
+      body: 'Resolved',
+    });
+
+    expect(await client.listPullRequestComments({ ...repo, pullNumber: 42 })).toEqual([
+      { id: comment?.id, body: 'inline', inReplyToId: null },
+      { id: replyId, body: 'Resolved', inReplyToId: comment?.id },
+    ]);
+  });
+
+  it('resolves the threads of given comments, and reports a permission refusal instead of throwing', async () => {
+    fake.pullRequestFiles.set('octo-demo/payments-api#42', [file]);
+    const reviewId = await client.createReview({
+      ...repo,
+      pullNumber: 42,
+      commitId: 'abc',
+      body: 'x',
+      comments: [{ path: 'src/a.ts', line: 2, body: 'inline' }],
+    });
+    const [comment] = await client.listReviewComments({ ...repo, pullNumber: 42, reviewId });
+    const commentIds = [comment?.id ?? 0];
+
+    fake.isThreadResolveForbidden = true;
+    const refused = await client.resolveReviewThreads({ ...repo, pullNumber: 42, commentIds });
+    fake.isThreadResolveForbidden = false;
+    const resolved = await client.resolveReviewThreads({ ...repo, pullNumber: 42, commentIds });
+
+    expect(refused).toEqual({ resolvedCount: 0, isPermissionDenied: true });
+    expect(resolved).toEqual({ resolvedCount: 1, isPermissionDenied: false });
+    expect(fake.resolvedThreads.has(`thread-${comment?.id}`)).toBe(true);
   });
 });

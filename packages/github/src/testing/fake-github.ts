@@ -67,6 +67,25 @@ export type FakeGithub = {
   reviews: FakeReview[];
   tokensMinted: number;
   requests: { method: string; path: string }[];
+  /** `owner/repo:base...head` → compare result; a missing key answers 404 (force-push). */
+  compares: Map<string, { status: string; files: PullRequestFile[] }>;
+  /** `owner/repo` → repository metadata. */
+  repoInfo: Map<string, { defaultBranch: string; isPrivate: boolean }>;
+  /** `owner/repo:branch` → head commit and its tree. */
+  branches: Map<string, { sha: string; treeSha: string }>;
+  /** `owner/repo:treeSha` → recursive tree. */
+  trees: Map<
+    string,
+    { entries: { path: string; sha: string; size: number }[]; truncated?: boolean }
+  >;
+  /** `owner/repo:blobSha` → file text (served base64 like GitHub). */
+  blobs: Map<string, string>;
+  /** Replies posted to review comments. */
+  replies: { id: number; repo: string; pullNumber: number; inReplyToId: number; body: string }[];
+  /** Thread ids (`thread-<firstCommentId>`) resolved through GraphQL. */
+  resolvedThreads: Set<string>;
+  /** Simulate GitHub refusing resolveReviewThread without Contents: write. */
+  isThreadResolveForbidden: boolean;
   /** Make the next `times` requests matching method + path regex fail with `status`. */
   failNext(method: string, pattern: RegExp, status: number, times?: number): void;
   reset(): void;
@@ -85,6 +104,14 @@ export function createFakeGithub(): FakeGithub {
     reviews: [],
     tokensMinted: 0,
     requests: [],
+    compares: new Map(),
+    branches: new Map(),
+    repoInfo: new Map(),
+    trees: new Map(),
+    blobs: new Map(),
+    replies: [],
+    resolvedThreads: new Set(),
+    isThreadResolveForbidden: false,
     failNext(method, pattern, status, times = 1) {
       faults.push({ method, pattern, status, remaining: times });
     },
@@ -96,6 +123,14 @@ export function createFakeGithub(): FakeGithub {
       fake.reviews.length = 0;
       fake.requests.length = 0;
       fake.tokensMinted = 0;
+      fake.compares.clear();
+      fake.branches.clear();
+      fake.repoInfo.clear();
+      fake.trees.clear();
+      fake.blobs.clear();
+      fake.replies.length = 0;
+      fake.resolvedThreads.clear();
+      fake.isThreadResolveForbidden = false;
       faults.length = 0;
     },
   };
@@ -242,6 +277,135 @@ export function createFakeGithub(): FakeGithub {
     http.get(`${API}/repos/:owner/:repo/pulls/:number/reviews/:reviewId/comments`, ({ params }) => {
       const review = fake.reviews.find((candidate) => candidate.id === Number(params.reviewId));
       return HttpResponse.json(review?.comments ?? []);
+    }),
+
+    http.get(`${API}/repos/:owner/:repo/compare/:basehead`, ({ params }) => {
+      const repo = `${String(params.owner)}/${String(params.repo)}`;
+      const compare = fake.compares.get(`${repo}:${String(params.basehead)}`);
+      return compare
+        ? HttpResponse.json({ status: compare.status, files: compare.files })
+        : HttpResponse.json({ message: 'No common ancestor between the commits' }, { status: 404 });
+    }),
+
+    http.get(`${API}/repos/:owner/:repo`, ({ params }) => {
+      const info = fake.repoInfo.get(`${String(params.owner)}/${String(params.repo)}`);
+      return info
+        ? HttpResponse.json({ default_branch: info.defaultBranch, private: info.isPrivate })
+        : HttpResponse.json({ message: 'Not Found' }, { status: 404 });
+    }),
+
+    http.get(`${API}/repos/:owner/:repo/branches/:branch`, ({ params }) => {
+      const head = fake.branches.get(
+        `${String(params.owner)}/${String(params.repo)}:${String(params.branch)}`,
+      );
+      return head
+        ? HttpResponse.json({
+            name: params.branch,
+            commit: { sha: head.sha, commit: { tree: { sha: head.treeSha } } },
+          })
+        : HttpResponse.json({ message: 'Branch not found' }, { status: 404 });
+    }),
+
+    http.get(`${API}/repos/:owner/:repo/git/trees/:treeSha`, ({ params }) => {
+      const tree = fake.trees.get(
+        `${String(params.owner)}/${String(params.repo)}:${String(params.treeSha)}`,
+      );
+      if (!tree) {
+        return HttpResponse.json({ message: 'Not Found' }, { status: 404 });
+      }
+      return HttpResponse.json({
+        sha: params.treeSha,
+        truncated: tree.truncated ?? false,
+        tree: tree.entries.map((entry) => ({ ...entry, mode: '100644', type: 'blob' })),
+      });
+    }),
+
+    http.get(`${API}/repos/:owner/:repo/git/blobs/:sha`, ({ params }) => {
+      const text = fake.blobs.get(
+        `${String(params.owner)}/${String(params.repo)}:${String(params.sha)}`,
+      );
+      return text === undefined
+        ? HttpResponse.json({ message: 'Not Found' }, { status: 404 })
+        : HttpResponse.json({
+            sha: params.sha,
+            encoding: 'base64',
+            content: Buffer.from(text).toString('base64'),
+          });
+    }),
+
+    http.get(`${API}/repos/:owner/:repo/pulls/:number/comments`, ({ params }) => {
+      const repo = `${String(params.owner)}/${String(params.repo)}`;
+      const pullNumber = Number(params.number);
+      const topLevel = fake.reviews
+        .filter((review) => review.repo === repo && review.pullNumber === pullNumber)
+        .flatMap((review) =>
+          review.comments.map((comment) => ({
+            id: comment.id,
+            body: comment.body,
+            in_reply_to_id: null,
+          })),
+        );
+      const replies = fake.replies
+        .filter((reply) => reply.repo === repo && reply.pullNumber === pullNumber)
+        .map((reply) => ({ id: reply.id, body: reply.body, in_reply_to_id: reply.inReplyToId }));
+      return HttpResponse.json([...topLevel, ...replies]);
+    }),
+
+    http.post(
+      `${API}/repos/:owner/:repo/pulls/:number/comments/:commentId/replies`,
+      async ({ request, params }) => {
+        const body = (await request.json()) as { body: string };
+        const reply = {
+          id: (nextId += 1),
+          repo: `${String(params.owner)}/${String(params.repo)}`,
+          pullNumber: Number(params.number),
+          inReplyToId: Number(params.commentId),
+          body: body.body,
+        };
+        fake.replies.push(reply);
+        return HttpResponse.json(
+          { id: reply.id, body: reply.body, in_reply_to_id: reply.inReplyToId },
+          { status: 201 },
+        );
+      },
+    ),
+
+    http.post(`${API}/graphql`, async ({ request }) => {
+      const { query, variables } = (await request.json()) as {
+        query: string;
+        variables: Record<string, unknown>;
+      };
+      if (query.includes('resolveReviewThread')) {
+        if (fake.isThreadResolveForbidden) {
+          return HttpResponse.json({
+            data: { resolveReviewThread: null },
+            errors: [{ type: 'FORBIDDEN', message: 'Resource not accessible by integration' }],
+          });
+        }
+        const threadId = String(variables.threadId);
+        fake.resolvedThreads.add(threadId);
+        return HttpResponse.json({
+          data: { resolveReviewThread: { thread: { id: threadId, isResolved: true } } },
+        });
+      }
+      const repo = `${String(variables.owner)}/${String(variables.repo)}`;
+      const nodes = fake.reviews
+        .filter((review) => review.repo === repo && review.pullNumber === Number(variables.number))
+        .flatMap((review) => review.comments)
+        .map((comment) => ({
+          id: `thread-${comment.id}`,
+          isResolved: fake.resolvedThreads.has(`thread-${comment.id}`),
+          comments: { nodes: [{ fullDatabaseId: String(comment.id) }] },
+        }));
+      return HttpResponse.json({
+        data: {
+          repository: {
+            pullRequest: {
+              reviewThreads: { pageInfo: { hasNextPage: false, endCursor: null }, nodes },
+            },
+          },
+        },
+      });
     }),
   ];
   return fake;

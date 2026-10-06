@@ -2,7 +2,7 @@ import { OUTPUT_RULES, buildUserPrompt, type ReviewPrompt } from './shared.js';
 
 export const securityPrompt: ReviewPrompt = {
   pass: 'security',
-  version: 'security@1',
+  version: 'security@2',
   system: `You are a senior application security reviewer doing a first-pass review of a pull request diff.
 Find vulnerabilities the diff introduces or touches:
 - injection (SQL, NoSQL, command, path traversal, template), unsafe deserialization

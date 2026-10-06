@@ -9,7 +9,12 @@ import {
   disconnectMongo,
   ensureDbIndexes,
 } from '@mergemind/db';
-import { QUEUE_NAMES, buildReviewJobId } from '@mergemind/shared';
+import {
+  QUEUE_NAMES,
+  buildIndexJobId,
+  buildReviewJobId,
+  type IndexRepoJobData,
+} from '@mergemind/shared';
 import { createLogger } from '@mergemind/shared/logger';
 import {
   TEST_WEBHOOK_SECRET,
@@ -23,6 +28,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, inject } from 'vitest';
 
 import { createApp } from '../../src/app.js';
+import { createIndexProducer, type IndexProducer } from '../../src/queues/index.producer.js';
 import { createReviewProducer, type ReviewProducer } from '../../src/queues/review.producer.js';
 import { createWebhookService } from '../../src/services/webhook.service.js';
 
@@ -38,7 +44,9 @@ const pullRequests = createPullRequestsRepository();
 
 let redis: Redis;
 let reviewProducer: ReviewProducer;
+let indexProducer: IndexProducer;
 let queue: Queue;
+let indexQueue: Queue<IndexRepoJobData>;
 let app: ReturnType<typeof createApp>;
 
 beforeAll(async () => {
@@ -48,6 +56,8 @@ beforeAll(async () => {
   const prefix = `test-${randomUUID()}`;
   reviewProducer = createReviewProducer({ connection: redis, prefix });
   queue = new Queue(QUEUE_NAMES.review, { connection: redis, prefix });
+  indexProducer = createIndexProducer({ connection: redis, prefix });
+  indexQueue = new Queue(QUEUE_NAMES.index, { connection: redis, prefix });
 
   app = createApp({
     logger: createLogger({ name: 'test', level: 'silent' }),
@@ -60,6 +70,7 @@ beforeAll(async () => {
         repositories,
         pullRequests,
         reviewProducer,
+        indexProducer,
       }),
     },
   });
@@ -67,7 +78,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await queue.close();
+  await indexQueue.close();
   await reviewProducer.close();
+  await indexProducer.close();
   await redis.quit();
   await mongoose.connection.dropDatabase();
   await disconnectMongo();
@@ -295,14 +308,45 @@ describe('pull_request.closed', () => {
   });
 });
 
-describe('events MergeMind does not handle yet', () => {
-  it('records push as ignored until Phase 4', async () => {
-    const { response, deliveryId } = await sendFixture('push.default-branch');
+describe('code index triggers (PRD F6)', () => {
+  it('enqueues index.repo for a push to the default branch', async () => {
+    const { response, deliveryId } = await sendFixture('push.default-branch', {
+      mutate: withRepoId(920001),
+    });
 
     expect(response.status).toBe(202);
     expect(await deliveries.findByDeliveryId(deliveryId)).toMatchObject({
-      status: 'ignored',
-      reason: 'not_yet_supported',
+      status: 'enqueued',
+      reason: 'index_enqueued',
     });
+    const after = 'c3d4e5f60718293a4b5c6d7e8f9012345678901a';
+    const job = await indexQueue.getJob(
+      buildIndexJobId({ githubRepoId: 920001, commitSha: after }),
+    );
+    expect(job?.data).toMatchObject({ trigger: 'push', defaultBranch: 'main', commitSha: after });
+  });
+
+  it('ignores pushes to other branches', async () => {
+    const { deliveryId } = await sendFixture('push.default-branch', {
+      mutate: (payload) => {
+        payload.ref = 'refs/heads/feature';
+      },
+    });
+
+    expect(await deliveries.findByDeliveryId(deliveryId)).toMatchObject({
+      status: 'ignored',
+      reason: 'not_default_branch',
+    });
+  });
+
+  it('enqueues a first index for every repo of a new installation', async () => {
+    await sendFixture('installation.created');
+
+    const jobs = await Promise.all(
+      [77700001, 77700002].map((githubRepoId) =>
+        indexQueue.getJob(buildIndexJobId({ githubRepoId, commitSha: null })),
+      ),
+    );
+    expect(jobs.map((job) => job?.data.trigger)).toEqual(['installation', 'installation']);
   });
 });

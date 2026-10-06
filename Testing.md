@@ -86,6 +86,7 @@ test/setup/                                    shared Testcontainers + MSW setup
   - `usageLedger` rows are written
 - **Incremental re-review:** second push → only new hunks sent to the LLM; fixed finding marked `resolved`; no duplicate comments.
 - **Crash recovery:** the worker throws after publish-stage step 1 → retry completes without duplicating comments.
+- **Index processor:** a first full index stores symbol chunks and marks the repo ready. A later push re-embeds only changed symbols and deletes removed files. A redelivered head is skipped. A private repo without Ollama on its allowlist is never embedded.
 - **Vector search:** the index is created on atlas-local; `$vectorSearch` returns the seeded chunk filtered by `repositoryId`.
 - **API:** auth required (401 without JWT, 403 for a foreign installation); cursor pagination; `problem+json` error shape.
 - **CI summary:** `workflow_run` failure → logs fetched (MSW) → one comment upserted (not duplicated on redelivery).

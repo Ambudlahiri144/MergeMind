@@ -22,6 +22,12 @@ const MAX_CHUNK_TOKENS = 100_000;
 const DEFAULT_PASS_CONCURRENCY = 3;
 const MAX_PASS_CONCURRENCY = 16;
 
+// Index caps (ADR-024): keep a repo's chunks well inside Atlas M0's 512 MB.
+const DEFAULT_INDEX_MAX_FILES = 1_500;
+const MAX_INDEX_FILES_LIMIT = 10_000;
+const DEFAULT_INDEX_MAX_FILE_BYTES = 200_000;
+const MAX_INDEX_FILE_BYTES_LIMIT = 1_000_000;
+
 const ConcurrencySchema = (fallback: number, max = MAX_CONCURRENCY) =>
   z.coerce.number().int().min(1).max(max).default(fallback);
 
@@ -58,6 +64,21 @@ export const WorkerEnvSchema = z
       .max(MAX_CHUNK_TOKENS)
       .default(DEFAULT_CHUNK_TOKENS),
     LLM_PASS_CONCURRENCY: ConcurrencySchema(DEFAULT_PASS_CONCURRENCY, MAX_PASS_CONCURRENCY),
+
+    // Code index (PRD F6, ADR-024): local Ollama embeddings, capped per repo.
+    EMBEDDING_MODEL: z.string().min(1).default('nomic-embed-text'),
+    INDEX_MAX_FILES: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_INDEX_FILES_LIMIT)
+      .default(DEFAULT_INDEX_MAX_FILES),
+    INDEX_MAX_FILE_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(MAX_INDEX_FILE_BYTES_LIMIT)
+      .default(DEFAULT_INDEX_MAX_FILE_BYTES),
 
     // Langfuse (ADR-010): tracing is on only when both keys are set.
     LANGFUSE_PUBLIC_KEY: z.string().min(1).optional(),

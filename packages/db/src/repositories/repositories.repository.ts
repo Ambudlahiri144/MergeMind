@@ -1,3 +1,4 @@
+import type { IndexStatus } from '@mergemind/shared';
 import { Types, type AnyBulkWriteOperation } from 'mongoose';
 
 import { RepositoryModel, type RepositoryRecord } from '../models/repository.model.js';
@@ -18,6 +19,8 @@ export type RepositoryView = {
   defaultBranch?: string;
   isInstalled: boolean;
   isEnabled: boolean;
+  indexStatus: IndexStatus;
+  lastIndexedSha?: string;
 };
 
 export type RepositoriesRepository = {
@@ -31,6 +34,10 @@ export type RepositoriesRepository = {
   markAllUninstalledForInstallation(installationId: string): Promise<number>;
   findIdByGithubRepoId(githubRepoId: number): Promise<string | null>;
   findByGithubRepoId(githubRepoId: number): Promise<RepositoryView | null>;
+  setIndexStatus(repositoryId: string, status: IndexStatus): Promise<void>;
+  /** Index finished at `sha`: status `ready` and the base of the next incremental index. */
+  markIndexed(repositoryId: string, sha: string): Promise<void>;
+  setDefaultBranch(repositoryId: string, defaultBranch: string): Promise<void>;
 };
 
 function buildUpsert(installationId: string, repo: GithubRepositoryInput) {
@@ -111,6 +118,8 @@ export function createRepositoriesRepository(): RepositoriesRepository {
           defaultBranch: 1,
           isInstalled: 1,
           isEnabled: 1,
+          indexStatus: 1,
+          lastIndexedSha: 1,
         },
       ).lean();
       if (!doc) {
@@ -125,7 +134,30 @@ export function createRepositoriesRepository(): RepositoriesRepository {
         ...(doc.defaultBranch === undefined ? {} : { defaultBranch: doc.defaultBranch }),
         isInstalled: doc.isInstalled,
         isEnabled: doc.isEnabled,
+        indexStatus: doc.indexStatus,
+        ...(doc.lastIndexedSha === undefined ? {} : { lastIndexedSha: doc.lastIndexedSha }),
       };
+    },
+
+    async setIndexStatus(repositoryId, status) {
+      await RepositoryModel.updateOne(
+        { _id: new Types.ObjectId(repositoryId) },
+        { $set: { indexStatus: status } },
+      );
+    },
+
+    async markIndexed(repositoryId, sha) {
+      await RepositoryModel.updateOne(
+        { _id: new Types.ObjectId(repositoryId) },
+        { $set: { indexStatus: 'ready', lastIndexedSha: sha } },
+      );
+    },
+
+    async setDefaultBranch(repositoryId, defaultBranch) {
+      await RepositoryModel.updateOne(
+        { _id: new Types.ObjectId(repositoryId) },
+        { $set: { defaultBranch } },
+      );
     },
   };
 }

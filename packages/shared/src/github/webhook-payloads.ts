@@ -76,3 +76,18 @@ export const PullRequestEventSchema = z.object({
   }),
 });
 export type PullRequestEvent = z.infer<typeof PullRequestEventSchema>;
+
+/** A push; only pushes to the default branch matter (they refresh the code index, PRD F6). */
+export const PushEventSchema = z.object({
+  ref: z.string().min(1),
+  after: GitShaSchema,
+  deleted: z.boolean().default(false),
+  installation: InstallationRefSchema,
+  repository: z.object({
+    id: GithubIdSchema,
+    full_name: z.string().min(1),
+    private: z.boolean(),
+    default_branch: z.string().min(1),
+  }),
+});
+export type PushEvent = z.infer<typeof PushEventSchema>;

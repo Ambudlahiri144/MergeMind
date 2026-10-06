@@ -5,7 +5,7 @@ import { maintainabilityPrompt } from './maintainability.prompt.js';
 import { securityPrompt } from './security.prompt.js';
 import type { ReviewPrompt } from './shared.js';
 
-export type { ReviewPrompt, ReviewPromptInput } from './shared.js';
+export type { ContextSnippet, ReviewPrompt, ReviewPromptInput } from './shared.js';
 
 export const REVIEW_PROMPTS: Record<ReviewPass, ReviewPrompt> = {
   security: securityPrompt,

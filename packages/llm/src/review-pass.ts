@@ -11,7 +11,7 @@ import type { Logger } from '@mergemind/shared/logger';
 import { APICallError, NoObjectGeneratedError, Output, generateText, type ModelMessage } from 'ai';
 
 import { CircuitBreaker, systemClock, type Clock } from './circuit-breaker.js';
-import { REVIEW_PROMPTS } from './prompts/index.js';
+import { REVIEW_PROMPTS, type ContextSnippet } from './prompts/index.js';
 import { isProviderAllowed } from './provider-policy.js';
 import type { ProviderEntry } from './providers.js';
 import { noopTracer, type LlmCallOutcome, type LlmTracer } from './tracer.js';
@@ -24,6 +24,8 @@ export type ReviewPassInput = {
   pass: ReviewPass;
   persona: string;
   files: readonly Pick<FileDiff, 'path' | 'previousPath' | 'hunks'>[];
+  /** Retrieved repository code for this chunk (PRD F6); omitted when the index is not ready. */
+  context?: readonly ContextSnippet[];
   isPrivateRepo: boolean;
   allowedProviders: readonly LlmProviderName[];
 };
@@ -108,7 +110,11 @@ export function createReviewLlm(config: ReviewLlmConfig): ReviewLlm {
   return {
     async reviewPass(input) {
       const prompt = REVIEW_PROMPTS[input.pass];
-      const user = prompt.buildUser({ persona: input.persona, files: input.files });
+      const user = prompt.buildUser({
+        persona: input.persona,
+        files: input.files,
+        ...(input.context === undefined ? {} : { context: input.context }),
+      });
       const chain = config.providers.filter((provider) => isProviderAllowed(provider.name, input));
       const calls: LlmCallRecord[] = [];
       let lastError: unknown = new Error('No provider is allowed for this repository');

@@ -1,4 +1,9 @@
-import { LlmUnavailableError, type LlmCallRecord, type ReviewLlm } from '@mergemind/llm';
+import {
+  LlmUnavailableError,
+  type ContextSnippet,
+  type LlmCallRecord,
+  type ReviewLlm,
+} from '@mergemind/llm';
 import type { CandidateFinding, LlmProviderName, ReviewPass } from '@mergemind/shared';
 import pLimit from 'p-limit';
 
@@ -8,6 +13,8 @@ export type RunPassesInput = {
   runId: string;
   passes: readonly ReviewPass[];
   chunks: readonly ReviewChunk[];
+  /** Retrieved context per chunk, same order as `chunks` (PRD F6). */
+  contexts?: readonly (readonly ContextSnippet[])[];
   persona: string;
   isPrivateRepo: boolean;
   allowedProviders: readonly LlmProviderName[];
@@ -29,10 +36,12 @@ export type RunPassesResult = {
  */
 export async function runPasses(llm: ReviewLlm, input: RunPassesInput): Promise<RunPassesResult> {
   const limit = pLimit(input.concurrency);
-  const tasks = input.passes.flatMap((pass) => input.chunks.map((chunk) => ({ pass, chunk })));
+  const tasks = input.passes.flatMap((pass) =>
+    input.chunks.map((chunk, index) => ({ pass, chunk, context: input.contexts?.[index] ?? [] })),
+  );
 
   const outcomes = await Promise.all(
-    tasks.map(({ pass, chunk }) =>
+    tasks.map(({ pass, chunk, context }) =>
       limit(async () => {
         try {
           const result = await llm.reviewPass({
@@ -40,6 +49,7 @@ export async function runPasses(llm: ReviewLlm, input: RunPassesInput): Promise<
             pass,
             persona: input.persona,
             files: chunk.files,
+            ...(context.length > 0 ? { context } : {}),
             isPrivateRepo: input.isPrivateRepo,
             allowedProviders: input.allowedProviders,
           });
