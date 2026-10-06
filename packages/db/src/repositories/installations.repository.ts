@@ -1,4 +1,5 @@
 import type { AccountType, InstallationStatus, LlmProviderName } from '@mergemind/shared';
+import { Types } from 'mongoose';
 
 import { InstallationModel } from '../models/installation.model.js';
 
@@ -24,7 +25,42 @@ export type InstallationsRepository = {
   upsertFromGithub(input: UpsertInstallationInput): Promise<string>;
   findIdByGithubId(githubInstallationId: number): Promise<string | null>;
   findByGithubId(githubInstallationId: number): Promise<InstallationView | null>;
+  findById(installationId: string): Promise<InstallationView | null>;
+  /** Active installations, oldest first, bounded (access resolution, ADR-030). */
+  listActive(limit: number): Promise<InstallationView[]>;
+  setBudget(installationId: string, monthlyTokenBudget: number): Promise<void>;
 };
+
+const VIEW_PROJECTION = {
+  githubInstallationId: 1,
+  accountLogin: 1,
+  accountType: 1,
+  status: 1,
+  monthlyTokenBudget: 1,
+  allowedProviders: 1,
+} as const;
+
+type LeanInstallation = {
+  _id: Types.ObjectId;
+  githubInstallationId: number;
+  accountLogin: string;
+  accountType: AccountType;
+  status: InstallationStatus;
+  monthlyTokenBudget: number;
+  allowedProviders: LlmProviderName[];
+};
+
+function toView(doc: LeanInstallation): InstallationView {
+  return {
+    id: doc._id.toString(),
+    githubInstallationId: doc.githubInstallationId,
+    accountLogin: doc.accountLogin,
+    accountType: doc.accountType,
+    status: doc.status,
+    monthlyTokenBudget: doc.monthlyTokenBudget,
+    allowedProviders: doc.allowedProviders,
+  };
+}
 
 export function createInstallationsRepository(): InstallationsRepository {
   return {
@@ -53,27 +89,32 @@ export function createInstallationsRepository(): InstallationsRepository {
     async findByGithubId(githubInstallationId) {
       const doc = await InstallationModel.findOne(
         { githubInstallationId },
-        {
-          githubInstallationId: 1,
-          accountLogin: 1,
-          accountType: 1,
-          status: 1,
-          monthlyTokenBudget: 1,
-          allowedProviders: 1,
-        },
-      ).lean();
-      if (!doc) {
-        return null;
-      }
-      return {
-        id: doc._id.toString(),
-        githubInstallationId: doc.githubInstallationId,
-        accountLogin: doc.accountLogin,
-        accountType: doc.accountType,
-        status: doc.status,
-        monthlyTokenBudget: doc.monthlyTokenBudget,
-        allowedProviders: doc.allowedProviders,
-      };
+        VIEW_PROJECTION,
+      ).lean<LeanInstallation>();
+      return doc ? toView(doc) : null;
+    },
+
+    async findById(installationId) {
+      const doc = await InstallationModel.findOne(
+        { _id: new Types.ObjectId(installationId) },
+        VIEW_PROJECTION,
+      ).lean<LeanInstallation>();
+      return doc ? toView(doc) : null;
+    },
+
+    async listActive(limit) {
+      const docs = await InstallationModel.find({ status: 'active' }, VIEW_PROJECTION)
+        .sort({ _id: 1 })
+        .limit(limit)
+        .lean<LeanInstallation[]>();
+      return docs.map(toView);
+    },
+
+    async setBudget(installationId, monthlyTokenBudget) {
+      await InstallationModel.updateOne(
+        { _id: new Types.ObjectId(installationId) },
+        { $set: { monthlyTokenBudget } },
+      );
     },
   };
 }

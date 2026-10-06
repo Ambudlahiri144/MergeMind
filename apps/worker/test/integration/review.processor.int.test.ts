@@ -226,6 +226,7 @@ async function createScenario(
       isDraft: options.isDraft ?? false,
       trigger: 'opened',
       githubUpdatedAt: '2026-10-06T10:00:00Z',
+      attempt: 1,
     },
   };
 }
@@ -381,6 +382,25 @@ describe('review pipeline end to end', () => {
       critical: 1,
       duplicate: 1,
     });
+  });
+
+  it('runs a manual rerun as a new attempt: new run and check, no duplicate comments', async () => {
+    const scenario = await createScenario();
+    const llm = createFakeLlm({ security: [SQL_INJECTION] });
+    const first = await runReview(scenario.data, meta(), buildDeps(llm));
+
+    const rerun = await runReview(
+      { ...scenario.data, trigger: 'manual', attempt: 2 },
+      meta(),
+      buildDeps(llm),
+    );
+
+    expect(rerun.status).toBe('completed');
+    expect(rerun.runId).not.toBe(first.runId);
+    expect((await repos.reviewRuns.findById(rerun.runId ?? ''))?.attempt).toBe(2);
+    expect(checksFor(scenario)).toHaveLength(2);
+    expect(reviewsFor(scenario)).toHaveLength(1);
+    expect(rerun.gateConclusion).toBe('failure');
   });
 
   it('skips with a neutral check and no LLM calls when the budget is used up', async () => {

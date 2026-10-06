@@ -137,7 +137,14 @@ export type GithubInstallationClient = {
   ): Promise<{ id: number; body: string } | null>;
   createIssueComment(input: RepoRef & { issueNumber: number; body: string }): Promise<number>;
   updateIssueComment(input: RepoRef & { commentId: number; body: string }): Promise<void>;
+  /**
+   * A user's membership of the installation's organisation, or null when they are not a
+   * member (needs Organization -> Members: read; web UI access, ADR-030).
+   */
+  getOrgMembership(input: { org: string; username: string }): Promise<OrgMembership | null>;
 };
+
+export type OrgMembership = { role: 'admin' | 'member'; state: 'active' | 'pending' };
 
 export type WorkflowJob = {
   id: number;
@@ -546,6 +553,22 @@ function createInstallationClient(octokit: ReviewOctokitInstance): GithubInstall
     updateIssueComment: ({ owner, repo, commentId, body }) =>
       callGithub('updateIssueComment', async () => {
         await octokit.rest.issues.updateComment({ owner, repo, comment_id: commentId, body });
+      }),
+
+    getOrgMembership: ({ org, username }) =>
+      callGithub('getMembershipForUser', async () => {
+        try {
+          const { data } = await octokit.rest.orgs.getMembershipForUser({ org, username });
+          return {
+            role: data.role === 'admin' ? ('admin' as const) : ('member' as const),
+            state: data.state === 'active' ? ('active' as const) : ('pending' as const),
+          };
+        } catch (error) {
+          if (statusOf(error) === HTTP_NOT_FOUND) {
+            return null;
+          }
+          throw error;
+        }
       }),
 
     resolveReviewThreads: async ({ owner, repo, pullNumber, commentIds }) => {

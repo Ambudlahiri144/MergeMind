@@ -40,7 +40,7 @@
 | HTTP mocking (GitHub REST, Groq, Gemini, Ollama) | **MSW** (`msw/node`) | One tool for all outbound HTTP. Unhandled requests **fail** the test (`onUnhandledRequest: 'error'`) |
 | LLM mocking at SDK level | AI SDK mock language/embedding models (`ai/test`) | For unit tests of `packages/llm` |
 | Time | `vi.useFakeTimers()` / injected `Clock` | Backoff, TTL, budget periods |
-| Browser E2E | **Playwright** | Chromium in CI, all 3 engines locally on demand |
+| Browser E2E | **Playwright** | Chromium in CI, all 3 engines locally on demand. `apps/web/e2e/stack.ts` is the webServer: it starts Mongo + Redis containers, seeds data, runs the real api in-process (no GitHub App, so policy and snippets show their 503 error state) and `next dev` with the test sign-in seam: `MERGEMIND_E2E=1` makes the web accept a signed `mm_e2e_session` cookie instead of a GitHub session, never in production (ADR-029) |
 | Accessibility | `@axe-core/playwright` | Zero serious/critical violations |
 | Load | autocannon | Replays signed webhook payloads |
 
@@ -99,7 +99,7 @@ test/setup/                                    shared Testcontainers + MSW setup
 - **Repository visibility:** `repository.publicized`/`renamed` update a tracked repo; an unknown repo is ignored; a job payload may only escalate a repo to private (ADR-027).
 
 ### E2E
-- Sign-in (Auth.js mocked provider), then repository list, then PR, then run detail with findings.
+- Sign-in, then repository list, then PR, then run detail with findings. An anonymous visitor is sent to sign-in.
 - Dismiss a finding → it disappears from open findings, and the suppression is created.
 - Empty, loading and error states render.
 - Light and dark themes; mobile viewport (390×844) has no horizontal page scroll.

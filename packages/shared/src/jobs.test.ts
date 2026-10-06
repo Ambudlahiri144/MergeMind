@@ -77,3 +77,20 @@ describe('buildCiSummaryJobId', () => {
     expect(first).not.toContain(':');
   });
 });
+
+describe('buildIndexJobId for a manual reindex', () => {
+  it('is unique per minute and never collides with push or initial ids', () => {
+    const at = new Date('2026-10-06T15:42:59Z');
+
+    const id = buildIndexJobId({
+      githubRepoId: 777,
+      commitSha: null,
+      trigger: 'manual',
+      requestedAt: at,
+    });
+
+    expect(id).toBe('777@manual-202610061542');
+    expect(id).not.toContain(':');
+    expect(buildIndexJobId({ githubRepoId: 777, commitSha: null })).toBe('777@initial');
+  });
+});

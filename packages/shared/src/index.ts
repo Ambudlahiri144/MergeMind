@@ -1,3 +1,5 @@
+export * from './api/cursor.js';
+export * from './api/schemas.js';
 export * from './assert.js';
 export * from './async.js';
 export * from './constants.js';

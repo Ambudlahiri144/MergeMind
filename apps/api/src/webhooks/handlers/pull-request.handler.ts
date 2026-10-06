@@ -42,6 +42,7 @@ export function toReviewJobData(
     isDraft: pr.draft,
     trigger,
     githubUpdatedAt: pr.updated_at,
+    attempt: 1,
   };
 }
 

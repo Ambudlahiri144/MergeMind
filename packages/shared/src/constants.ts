@@ -26,3 +26,9 @@ export type LlmProviderName = (typeof LLM_PROVIDER_NAMES)[number];
 
 /** Default for `installations.allowedProviders`: Gemini free tier is excluded (ADR-007). */
 export const DEFAULT_ALLOWED_PROVIDERS: readonly LlmProviderName[] = ['groq', 'ollama'];
+
+/** web -> api bearer tokens (ADR-029): short-lived HS256, signed with `API_JWT_SECRET`. */
+export const API_JWT_ISSUER = 'mergemind-web';
+export const API_JWT_AUDIENCE = 'mergemind-api';
+export const API_JWT_TTL_SECONDS = 300;
+export const MIN_API_JWT_SECRET_LENGTH = 32;

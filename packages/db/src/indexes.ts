@@ -6,6 +6,7 @@ import { RepositoryModel } from './models/repository.model.js';
 import { ReviewRunModel } from './models/review-run.model.js';
 import { SuppressionModel } from './models/suppression.model.js';
 import { UsageLedgerModel } from './models/usage-ledger.model.js';
+import { UserModel } from './models/user.model.js';
 import { WebhookDeliveryModel } from './models/webhook-delivery.model.js';
 
 const MODELS = [
@@ -18,6 +19,7 @@ const MODELS = [
   SuppressionModel,
   UsageLedgerModel,
   CodeChunkModel,
+  UserModel,
 ];
 
 /**

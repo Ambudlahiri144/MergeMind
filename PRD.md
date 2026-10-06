@@ -63,7 +63,7 @@ When CI fails, engineers scroll through thousands of log lines to find the one t
 | F8 | **Confidence filter + suppressions** | Findings below `minConfidence` (default 0.7) are dropped. A developer can dismiss a finding, which creates a suppression (by fingerprint) for that repo. |
 | F9 | **Per-org token budget** | Every LLM call is recorded in `usageLedger`. At 80% of the monthly budget, the run summary warns. At 100%, reviews are skipped with a `neutral` check explaining why. |
 | F10 | **CI failure summary** | A `workflow_run` event that completes with conclusion `failure` (or `timed_out`) on a PR branch fetches the failed job logs, extracts the relevant window, and posts one summary comment citing log lines. There is one comment per PR per workflow, updated in place on re-runs and later failures, and marked "passing again" when the workflow succeeds. Private-repo logs follow the provider allowlist; without an allowed provider or budget, the comment shows the log excerpt only. |
-| F11 | **Thin web UI** | Next.js app with GitHub sign-in, repositories, PR detail with review runs, run detail with findings, and settings for policy view and budget. See [Design.md](Design.md). |
+| F11 | **Thin web UI** | Next.js app with GitHub sign-in, repositories, PR detail with review runs, run detail with findings, and settings for policy view and budget. A user sees the installations they own or belong to (org members), and only owners and org admins change the budget or turn a repository off. The marketing landing page ships in Phase 7, once real screenshots exist. See [Design.md](Design.md). |
 
 ### Out of scope for MVP
 - Writing code fixes as commits
@@ -101,7 +101,7 @@ When CI fails, engineers scroll through thousands of log lines to find the one t
 | GitHub | GitHub App via Octokit (`@octokit/app`) |
 | Observability | pino logs, Langfuse (LLM traces) |
 | Frontend | Next.js (App Router), Tailwind v4, shadcn/ui, Phosphor icons, Geist fonts |
-| Auth (web) | Auth.js with the GitHub provider |
+| Auth (web) | Better Auth (stateless cookie session) with the GitHub provider, using the GitHub App's OAuth client |
 | Testing | Vitest, Supertest, Testcontainers, MSW, Playwright, custom eval runner |
 | Local infra | Docker Compose (atlas-local, Redis), smee.io webhook proxy |
 

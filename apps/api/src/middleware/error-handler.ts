@@ -1,4 +1,10 @@
-import { NotFoundError, ValidationError, isAppError, type ProblemDetails } from '@mergemind/shared';
+import {
+  NotFoundError,
+  RateLimitedError,
+  ValidationError,
+  isAppError,
+  type ProblemDetails,
+} from '@mergemind/shared';
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 
 const PROBLEM_CONTENT_TYPE = 'application/problem+json';
@@ -76,5 +82,8 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, req, res, next
     };
   }
 
+  if (appError instanceof RateLimitedError && appError.retryAfterSeconds !== undefined) {
+    res.setHeader('Retry-After', String(appError.retryAfterSeconds));
+  }
   res.status(problem.status).type(PROBLEM_CONTENT_TYPE).json(problem);
 };

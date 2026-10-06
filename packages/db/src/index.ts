@@ -9,4 +9,5 @@ export * from './repositories/review-runs.repository.js';
 export * from './repositories/suppressions.repository.js';
 export * from './repositories/usage-ledger.repository.js';
 export * from './repositories/code-chunks.repository.js';
+export * from './repositories/users.repository.js';
 export * from './vector-index.js';

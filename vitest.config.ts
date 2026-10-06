@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
 // Resolve @mergemind/* packages to their TypeScript sources (see each package's "exports").
@@ -8,8 +10,17 @@ const SOURCE_CONDITIONS = ['@mergemind/source', 'node', 'development|production'
 const INT_TEST_TIMEOUT_MS = 60_000;
 const INT_HOOK_TIMEOUT_MS = 180_000;
 
+const fromRoot = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+
 export default defineConfig({
-  resolve: { conditions: SOURCE_CONDITIONS },
+  resolve: {
+    conditions: SOURCE_CONDITIONS,
+    alias: [
+      // apps/web: its `@/` path alias, and `server-only` (throws outside React Server).
+      { find: /^@\/(.*)$/, replacement: `${fromRoot('./apps/web/src/')}$1` },
+      { find: 'server-only', replacement: fromRoot('./test/setup/server-only-stub.ts') },
+    ],
+  },
   ssr: { resolve: { conditions: SOURCE_CONDITIONS } },
   test: {
     projects: [

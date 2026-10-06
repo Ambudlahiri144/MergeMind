@@ -46,7 +46,53 @@ export type RepositoriesRepository = {
     githubRepoId: number,
     changes: { fullName?: string; isPrivate?: boolean },
   ): Promise<boolean>;
+  findById(repositoryId: string): Promise<RepositoryView | null>;
+  /** One page of an installation's repos by name; `after` is the last row of the previous page. */
+  listForInstallation(
+    installationId: string,
+    page: { limit: number; after?: { fullName: string; id: string } },
+  ): Promise<RepositoryView[]>;
+  setEnabled(repositoryId: string, isEnabled: boolean): Promise<void>;
 };
+
+const VIEW_PROJECTION = {
+  installationId: 1,
+  githubRepoId: 1,
+  fullName: 1,
+  isPrivate: 1,
+  defaultBranch: 1,
+  isInstalled: 1,
+  isEnabled: 1,
+  indexStatus: 1,
+  lastIndexedSha: 1,
+} as const;
+
+type LeanRepository = Pick<
+  RepositoryRecord,
+  | 'githubRepoId'
+  | 'fullName'
+  | 'isPrivate'
+  | 'defaultBranch'
+  | 'isInstalled'
+  | 'isEnabled'
+  | 'indexStatus'
+  | 'lastIndexedSha'
+> & { _id: Types.ObjectId; installationId: Types.ObjectId };
+
+function toView(doc: LeanRepository): RepositoryView {
+  return {
+    id: doc._id.toString(),
+    installationId: doc.installationId.toString(),
+    githubRepoId: doc.githubRepoId,
+    fullName: doc.fullName,
+    isPrivate: doc.isPrivate,
+    ...(doc.defaultBranch === undefined ? {} : { defaultBranch: doc.defaultBranch }),
+    isInstalled: doc.isInstalled,
+    isEnabled: doc.isEnabled,
+    indexStatus: doc.indexStatus,
+    ...(doc.lastIndexedSha === undefined ? {} : { lastIndexedSha: doc.lastIndexedSha }),
+  };
+}
 
 function buildUpsert(installationId: string, repo: GithubRepositoryInput) {
   return {
@@ -118,33 +164,43 @@ export function createRepositoriesRepository(): RepositoriesRepository {
     async findByGithubRepoId(githubRepoId) {
       const doc = await RepositoryModel.findOne(
         { githubRepoId },
-        {
-          installationId: 1,
-          githubRepoId: 1,
-          fullName: 1,
-          isPrivate: 1,
-          defaultBranch: 1,
-          isInstalled: 1,
-          isEnabled: 1,
-          indexStatus: 1,
-          lastIndexedSha: 1,
-        },
-      ).lean();
-      if (!doc) {
-        return null;
-      }
-      return {
-        id: doc._id.toString(),
-        installationId: doc.installationId.toString(),
-        githubRepoId: doc.githubRepoId,
-        fullName: doc.fullName,
-        isPrivate: doc.isPrivate,
-        ...(doc.defaultBranch === undefined ? {} : { defaultBranch: doc.defaultBranch }),
-        isInstalled: doc.isInstalled,
-        isEnabled: doc.isEnabled,
-        indexStatus: doc.indexStatus,
-        ...(doc.lastIndexedSha === undefined ? {} : { lastIndexedSha: doc.lastIndexedSha }),
+        VIEW_PROJECTION,
+      ).lean<LeanRepository>();
+      return doc ? toView(doc) : null;
+    },
+
+    async findById(repositoryId) {
+      const doc = await RepositoryModel.findOne(
+        { _id: new Types.ObjectId(repositoryId) },
+        VIEW_PROJECTION,
+      ).lean<LeanRepository>();
+      return doc ? toView(doc) : null;
+    },
+
+    async listForInstallation(installationId, { limit, after }) {
+      const filter = {
+        installationId: new Types.ObjectId(installationId),
+        ...(after === undefined
+          ? {}
+          : {
+              $or: [
+                { fullName: { $gt: after.fullName } },
+                { fullName: after.fullName, _id: { $gt: new Types.ObjectId(after.id) } },
+              ],
+            }),
       };
+      const docs = await RepositoryModel.find(filter, VIEW_PROJECTION)
+        .sort({ fullName: 1, _id: 1 })
+        .limit(limit)
+        .lean<LeanRepository[]>();
+      return docs.map(toView);
+    },
+
+    async setEnabled(repositoryId, isEnabled) {
+      await RepositoryModel.updateOne(
+        { _id: new Types.ObjectId(repositoryId) },
+        { $set: { isEnabled } },
+      );
     },
 
     async setIndexStatus(repositoryId, status) {

@@ -336,3 +336,15 @@ describe('CI summary endpoints (PRD F10)', () => {
     ).toBeNull();
   });
 });
+
+describe('getOrgMembership (ADR-030)', () => {
+  it('reads an active admin, and null for a non-member', async () => {
+    fake.orgMemberships.set('octo-demo:rohan-mehta', { role: 'admin', state: 'active' });
+
+    expect(await client.getOrgMembership({ org: 'octo-demo', username: 'rohan-mehta' })).toEqual({
+      role: 'admin',
+      state: 'active',
+    });
+    expect(await client.getOrgMembership({ org: 'octo-demo', username: 'stranger' })).toBeNull();
+  });
+});

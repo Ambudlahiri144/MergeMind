@@ -145,14 +145,19 @@ export async function runIndex(data: IndexRepoJobData, deps: IndexDeps): Promise
     }
   }
   const head = await client.getBranchHead({ ...repoRef, branch: defaultBranch });
-  if (repository.lastIndexedSha === head.sha && repository.indexStatus === 'ready') {
+  // A reindex asked from the UI always runs: a full pass over the tree, where unchanged
+  // content is still not re-embedded (ADR-031).
+  const isManual = data.trigger === 'manual';
+  if (!isManual && repository.lastIndexedSha === head.sha && repository.indexStatus === 'ready') {
     return { status: 'skipped', reason: 'already_indexed' };
   }
 
   await deps.repositories.setIndexStatus(repository.id, 'indexing');
   try {
     const [plan, tree, policyText] = await Promise.all([
-      planChanges(client, repoRef, repository.lastIndexedSha, head.sha),
+      isManual
+        ? Promise.resolve({ mode: 'full' as const })
+        : planChanges(client, repoRef, repository.lastIndexedSha, head.sha),
       client.getTree({ ...repoRef, treeSha: head.treeSha }),
       client.getFileText({ ...repoRef, path: POLICY_FILE_PATH, ref: head.sha }),
     ]);

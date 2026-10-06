@@ -54,6 +54,7 @@ export type ReviewRunView = {
   policyErrors: string[];
   failedPasses: ReviewPass[];
   error?: { code: string; message: string };
+  createdAt: Date;
 };
 
 export type AnalyzedPatch = {
@@ -85,6 +86,14 @@ export type ReviewRunsRepository = {
   complete(runId: string, patch: CompleteRunPatch): Promise<void>;
   fail(runId: string, error: { code: string; message: string }): Promise<void>;
   findById(runId: string): Promise<ReviewRunView | null>;
+  /** A PR's runs, newest first (PR detail timeline). */
+  listForPr(pullRequestId: string, limit: number): Promise<ReviewRunView[]>;
+  /** The newest run of each PR (PR list). */
+  latestForPrs(pullRequestIds: readonly string[]): Promise<Map<string, ReviewRunView>>;
+  /** Highest attempt at this head so far; 0 when none (manual rerun, ADR-031). */
+  maxAttempt(repositoryId: string, headSha: string): Promise<number>;
+  /** When each repository was last reviewed (repository list). */
+  lastRunAtByRepository(repositoryIds: readonly string[]): Promise<Map<string, Date>>;
 };
 
 type LeanRun = ReviewRunRecord & { _id: Types.ObjectId };
@@ -99,14 +108,16 @@ function toView(doc: LeanRun): ReviewRunView {
     trigger: doc.trigger,
     mode: doc.mode,
     status: doc.status,
-    counts: doc.counts,
+    // Runs written before a count or timing existed lack it; lean reads skip schema defaults.
+    counts: { ...EMPTY_COUNTS, ...doc.counts },
     tokens: doc.tokens,
-    timings: doc.timings,
+    timings: { ...EMPTY_TIMINGS, ...doc.timings },
     promptVersion: doc.promptVersion,
     attempt: doc.attempt,
     isBudgetWarning: doc.isBudgetWarning,
     policyErrors: doc.policyErrors,
     failedPasses: doc.failedPasses,
+    createdAt: doc.createdAt,
     ...(doc.skipReason === undefined ? {} : { skipReason: doc.skipReason }),
     ...(doc.checkRunId === undefined ? {} : { checkRunId: doc.checkRunId }),
     ...(doc.githubReviewId === undefined ? {} : { githubReviewId: doc.githubReviewId }),
@@ -116,7 +127,7 @@ function toView(doc: LeanRun): ReviewRunView {
   };
 }
 
-const RUN_PROJECTION = { createdAt: 0, updatedAt: 0, __v: 0 } as const;
+const RUN_PROJECTION = { updatedAt: 0, __v: 0 } as const;
 
 export function createReviewRunsRepository(): ReviewRunsRepository {
   const byId = (runId: string) => ({ _id: new Types.ObjectId(runId) });
@@ -188,6 +199,50 @@ export function createReviewRunsRepository(): ReviewRunsRepository {
     async findById(runId) {
       const doc = await ReviewRunModel.findOne(byId(runId), RUN_PROJECTION).lean<LeanRun>();
       return doc ? toView(doc) : null;
+    },
+
+    async listForPr(pullRequestId, limit) {
+      const docs = await ReviewRunModel.find(
+        { pullRequestId: new Types.ObjectId(pullRequestId) },
+        RUN_PROJECTION,
+      )
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean<LeanRun[]>();
+      return docs.map(toView);
+    },
+
+    async latestForPrs(pullRequestIds) {
+      if (pullRequestIds.length === 0) {
+        return new Map();
+      }
+      const rows = await ReviewRunModel.aggregate<{ _id: Types.ObjectId; run: LeanRun }>([
+        { $match: { pullRequestId: { $in: pullRequestIds.map((id) => new Types.ObjectId(id)) } } },
+        { $sort: { pullRequestId: 1, createdAt: -1 } },
+        { $group: { _id: '$pullRequestId', run: { $first: '$$ROOT' } } },
+      ]);
+      return new Map(rows.map((row) => [row._id.toString(), toView(row.run)]));
+    },
+
+    async maxAttempt(repositoryId, headSha) {
+      const doc = await ReviewRunModel.findOne(
+        { repositoryId: new Types.ObjectId(repositoryId), headSha },
+        { attempt: 1 },
+      )
+        .sort({ attempt: -1 })
+        .lean();
+      return doc?.attempt ?? 0;
+    },
+
+    async lastRunAtByRepository(repositoryIds) {
+      if (repositoryIds.length === 0) {
+        return new Map();
+      }
+      const rows = await ReviewRunModel.aggregate<{ _id: Types.ObjectId; at: Date }>([
+        { $match: { repositoryId: { $in: repositoryIds.map((id) => new Types.ObjectId(id)) } } },
+        { $group: { _id: '$repositoryId', at: { $max: '$createdAt' } } },
+      ]);
+      return new Map(rows.map((row) => [row._id.toString(), row.at]));
     },
   };
 }

@@ -1,13 +1,19 @@
 import {
   connectMongo,
+  createFindingsRepository,
   createInstallationsRepository,
   createPullRequestsRepository,
   createRepositoriesRepository,
+  createReviewRunsRepository,
+  createSuppressionsRepository,
+  createUsageLedgerRepository,
+  createUsersRepository,
   createWebhookDeliveriesRepository,
   disconnectMongo,
   ensureDbIndexes,
   pingMongo,
 } from '@mergemind/db';
+import { createGithubApp, type GithubApp } from '@mergemind/github';
 import { registerGracefulShutdown } from '@mergemind/shared';
 import { createLogger } from '@mergemind/shared/logger';
 import { Redis } from 'ioredis';
@@ -17,6 +23,7 @@ import { loadApiEnv } from './config/env.js';
 import { createCiSummaryProducer } from './queues/ci-summary.producer.js';
 import { createIndexProducer } from './queues/index.producer.js';
 import { createReviewProducer } from './queues/review.producer.js';
+import { createAccessService } from './services/access.service.js';
 import { createWebhookService } from './services/webhook.service.js';
 
 const env = loadApiEnv();
@@ -33,11 +40,25 @@ async function main(): Promise<void> {
   const reviewProducer = createReviewProducer({ connection: redis });
   const indexProducer = createIndexProducer({ connection: redis });
   const ciSummaryProducer = createCiSummaryProducer({ connection: redis });
+  const installations = createInstallationsRepository();
+  const repositories = createRepositoriesRepository();
+  const pullRequests = createPullRequestsRepository();
+  const github: GithubApp | null =
+    env.GITHUB_APP_ID === undefined || env.GITHUB_APP_PRIVATE_KEY === undefined
+      ? null
+      : createGithubApp({
+          appId: env.GITHUB_APP_ID,
+          privateKey: env.GITHUB_APP_PRIVATE_KEY,
+          logger,
+        });
+  if (env.API_JWT_SECRET === undefined) {
+    logger.warn({ reason: 'api_jwt_secret_missing' }, 'api.authDisabled');
+  }
   const webhookService = createWebhookService({
     deliveries: createWebhookDeliveriesRepository(),
-    installations: createInstallationsRepository(),
-    repositories: createRepositoriesRepository(),
-    pullRequests: createPullRequestsRepository(),
+    installations,
+    repositories,
+    pullRequests,
     reviewProducer,
     indexProducer,
     ciSummaryProducer,
@@ -55,6 +76,30 @@ async function main(): Promise<void> {
       },
     ],
     webhook: { secret: env.GITHUB_WEBHOOK_SECRET, service: webhookService },
+    api: {
+      jwtSecret: env.API_JWT_SECRET ?? null,
+      rateLimit: { limit: env.API_RATE_LIMIT_PER_MINUTE, redis },
+      access: createAccessService({
+        installations,
+        users: createUsersRepository(),
+        github,
+        logger,
+        now: () => new Date(),
+      }),
+      stores: {
+        installations,
+        repositories,
+        pullRequests,
+        reviewRuns: createReviewRunsRepository(),
+        findings: createFindingsRepository(),
+        suppressions: createSuppressionsRepository(),
+        usageLedger: createUsageLedgerRepository(),
+      },
+      github,
+      reviewProducer,
+      indexProducer,
+      now: () => new Date(),
+    },
   });
 
   const server = app.listen(env.API_PORT, (error) => {

@@ -22,6 +22,8 @@ export default defineConfig(
       '**/dist/**',
       '**/.next/**',
       '**/coverage/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
       '**/next-env.d.ts',
       'evals/reports/**',
       '.agents/**',
@@ -74,7 +76,7 @@ export default defineConfig(
   {
     // Next.js special files and tool configs require default exports.
     files: [
-      'apps/web/src/app/**/{page,layout,route,loading,error,not-found,template,default}.tsx',
+      'apps/web/src/app/**/{page,layout,route,loading,error,global-error,not-found,template,default}.tsx',
       'apps/web/src/app/**/route.ts',
       '**/*.config.{js,ts,mjs}',
     ],

@@ -132,7 +132,7 @@ async function recordSilentSkip(
         headSha: base.data.headSha,
         baseSha: base.data.baseSha,
         trigger: base.data.trigger,
-        attempt: 1,
+        attempt: base.data.attempt,
         promptVersion: promptVersionFor(DEFAULT_POLICY.review.passes),
       })
     ).run;
@@ -716,7 +716,8 @@ export async function runReview(
     headSha: data.headSha,
     baseSha: data.baseSha,
     trigger: data.trigger,
-    attempt: 1,
+    // A manual rerun is a new attempt: a fresh run, check run and marker (ADR-031).
+    attempt: data.attempt,
     promptVersion: promptVersionFor(policy.policy.review.passes),
   });
   // A finished review is final; a skipped one is re-evaluated (draft → ready, budget reset).

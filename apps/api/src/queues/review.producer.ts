@@ -51,6 +51,7 @@ export function createReviewProducer({
         prNumber: data.prNumber,
         headSha: data.headSha,
         trigger: data.trigger,
+        attempt: data.attempt,
       });
       await queue.add(JOB_NAMES.reviewPr, data, { jobId });
       return jobId;

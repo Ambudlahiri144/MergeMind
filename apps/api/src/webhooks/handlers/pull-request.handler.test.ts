@@ -32,6 +32,7 @@ describe('toReviewJobData', () => {
       isDraft: false,
       trigger: 'opened',
       githubUpdatedAt: '2026-10-05T10:00:00Z',
+      attempt: 1,
     });
   });
 });

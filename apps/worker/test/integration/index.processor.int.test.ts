@@ -218,6 +218,19 @@ describe('index.repo (PRD F6)', () => {
     expect(embedder.texts).toHaveLength(0);
   });
 
+  it('runs a manual reindex of an indexed head without re-embedding unchanged code', async () => {
+    const { fullName, job } = await createRepo();
+    fakeGithub.repoInfo.set(fullName, { defaultBranch: 'main', isPrivate: false });
+    publishCommit(fullName, SHA_1, { 'src/users.ts': USERS_V1 });
+    await runIndex(job, buildDeps(createFakeEmbedder()));
+    const embedder = createFakeEmbedder();
+
+    const outcome = await runIndex({ ...job, trigger: 'manual' }, buildDeps(embedder));
+
+    expect(outcome).toMatchObject({ status: 'indexed', mode: 'full' });
+    expect(embedder.texts).toHaveLength(0);
+  });
+
   it('never embeds a private repo whose installation does not allow Ollama', async () => {
     const { job } = await createRepo({ isPrivate: true, allowedProviders: ['groq'] });
     const embedder = createFakeEmbedder();

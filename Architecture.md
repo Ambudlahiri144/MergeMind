@@ -22,8 +22,9 @@ flowchart LR
     WK -- LLM calls --> LLM{{"Provider chain<br/>Groq → Gemini → Ollama"}}
     WK -- embeddings --> OLL[[Ollama<br/>nomic-embed-text]]
     WK -- traces --> LF[(Langfuse)]
-    WEB -- JWT --> API
-    USER((User)) --> WEB
+    WEB -- "5-min JWT (identity only)" --> API
+    API -- "org membership, policy, snippets" --> GH
+    USER((User)) -- "Better Auth cookie" --> WEB
 ```
 
 ### Review flow (happy path)
@@ -279,7 +280,7 @@ Indexes: `{ repositoryId: 1, path: 1, symbol: 1 }` unique, `{ repositoryId: 1, n
 `{ deliveryId (unique), event, action?, status: 'received'|'enqueued'|'handled'|'ignored'|'failed', reason?, error?, attempts }`. `handled` = processed inline by the api (installation sync, PR closed). `attempts` counts reclaims of failed or stale (> 5 min `received`) rows. Indexes: `{ deliveryId: 1 }` unique, TTL on `createdAt` = 7 days.
 
 ### `users`
-`{ githubUserId (unique), login, avatarUrl, installationIds: ObjectId[] }`.
+`{ githubUserId (unique), login, access: [{ installationId, role: 'owner'|'admin'|'member' }], checkedInstallationIds: ObjectId[], accessCheckedAt }`. An access cache resolved by the api from GitHub (ADR-030): fresh for 10 minutes, and refreshed at once when an active installation appears that it never checked. Sessions are not stored here; they live in the web's encrypted cookie (ADR-029).
 
 ---
 
@@ -295,7 +296,7 @@ Indexes: `{ repositoryId: 1, path: 1, symbol: 1 }` unique, `{ repositoryId: 1, n
   ```
 - **Pagination:** cursor-based. `?limit=20&cursor=<opaque base64 of {_id, sortKey}>` → `{ data: [...], nextCursor: string | null }`. Max limit 100.
 - **Request IDs:** `x-request-id` is accepted or generated, echoed in the response, and attached to every log line.
-- **Auth:** Auth.js (GitHub provider) in `apps/web`. Server-side, web mints a short-lived (5 min) HS256 JWT `{ sub: githubUserId, login }` signed with `API_JWT_SECRET` and sends `Authorization: Bearer`. The API checks that the user can access the requested installation.
+- **Auth (ADR-029, ADR-030):** Better Auth (GitHub provider, stateless cookie session) in `apps/web`. Server-side, web mints a short-lived (5 min) HS256 JWT `{ sub: githubUserId, login }` (iss `mergemind-web`, aud `mergemind-api`) signed with `API_JWT_SECRET` and sends `Authorization: Bearer`. The API resolves the user's role per installation: owner of a user-account installation, or admin/member of the org (`GET /orgs/{org}/memberships/{user}`, needs Members: read). Reads, rerun, reindex and dismiss need member; enabling a repository and the budget need admin or owner. A missing resource is 404, a foreign one 403. Without `API_JWT_SECRET` every authenticated route answers 503.
 - **Rate limiting:** `express-rate-limit` with Redis store: 120 req/min per user on `/api/v1`. Webhooks are not limited (they are signature-verified).
 - **Status codes:** `200` read, `201` create, `202` accepted-async, `204` no content, `400` validation, `401`, `403`, `404`, `409` conflict, `429`, `500`, `503` (readiness only).
 
@@ -306,15 +307,17 @@ Indexes: `{ repositoryId: 1, path: 1, symbol: 1 }` unique, `{ repositoryId: 1, n
 | GET | `/api/v1/health` | Liveness |
 | GET | `/api/v1/ready` | Readiness (Mongo + Redis ping, 2 s timeout each): `200 {status:"ready",checks}` or `503 {status:"not_ready",checks}` |
 | GET | `/api/v1/me` | Current user + installations |
-| GET | `/api/v1/installations/:installationId/repositories` | List repos (cursor) |
+| GET | `/api/v1/installations/:installationId/repositories` | List repos by name (cursor), with open PRs and last review |
+| GET | `/api/v1/repositories/:repositoryId` | One repository |
 | PATCH | `/api/v1/repositories/:repositoryId` | `{ isEnabled }` |
-| POST | `/api/v1/repositories/:repositoryId/reindex` | Enqueue index job → 202 |
+| POST | `/api/v1/repositories/:repositoryId/reindex` | Enqueue a manual full index → 202 (409 while indexing or when disabled; ADR-031) |
 | GET | `/api/v1/repositories/:repositoryId/policy` | Effective policy (parsed `.mergemind.yml` + defaults + validation errors) |
 | GET | `/api/v1/repositories/:repositoryId/pulls` | PRs with latest run status (cursor, `?state=open`) |
 | GET | `/api/v1/repositories/:repositoryId/pulls/:number` | PR detail + run list |
-| GET | `/api/v1/runs/:runId` | Run detail + findings |
-| POST | `/api/v1/runs/:runId/rerun` | Manual rerun → 202 |
-| PATCH | `/api/v1/findings/:findingId` | `{ state: 'dismissed', reason? }` → creates suppression |
+| GET | `/api/v1/runs/:runId` | Run detail + findings (filtered ones counted, not listed) + `canRerun` |
+| GET | `/api/v1/findings/:findingId/snippet` | Flagged lines ± 3 at the run head, for the diff panel (503 without the GitHub App) |
+| POST | `/api/v1/runs/:runId/rerun` | Manual rerun → 202: next attempt at the PR's current head, trigger `manual` (409 for a closed PR or an older head; ADR-031) |
+| PATCH | `/api/v1/findings/:findingId` | `{ state: 'dismissed', reason? }` → dismisses and creates a suppression (idempotent; 409 for a resolved finding) |
 | GET | `/api/v1/installations/:installationId/usage` | Month-to-date tokens vs budget |
 | PUT | `/api/v1/installations/:installationId/budget` | `{ monthlyTokenBudget }` (org admin only) |
 
@@ -401,7 +404,7 @@ persona: "Senior backend reviewer. Concise. Cite exact lines."
 | Webhook proxy | `npx -p smee-client smee -u $SMEE_URL -t http://localhost:4000/webhooks/github` | |
 
 ### Environment variables (see `.env.example`)
-`NODE_ENV`, `LOG_LEVEL`, `API_PORT` (default 4000), `MONGO_HOST_PORT` / `REDIS_HOST_PORT` (docker compose host ports, default 27017 / 6379), `MONGODB_URI`, `REDIS_URL`, `REVIEW_CONCURRENCY` / `INDEX_CONCURRENCY` / `CI_SUMMARY_CONCURRENCY` (worker, defaults 4 / 1 / 2), `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (PEM, `\n`-escaped), `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `AUTH_SECRET`, `API_JWT_SECRET`, `API_BASE_URL`, `GROQ_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OLLAMA_BASE_URL`, `LLM_PRIMARY_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_LOCAL_MODEL`, `LLM_TIMEOUT_MS`, `EMBEDDING_MODEL` (default `nomic-embed-text`), `INDEX_MAX_FILES` / `INDEX_MAX_FILE_BYTES` (defaults 1,500 / 200,000), `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`, `LANGFUSE_REDACT_INPUTS`, `SMEE_URL`.
+`NODE_ENV`, `LOG_LEVEL`, `API_PORT` (default 4000), `MONGO_HOST_PORT` / `REDIS_HOST_PORT` (docker compose host ports, default 27017 / 6379), `MONGODB_URI`, `REDIS_URL`, `REVIEW_CONCURRENCY` / `INDEX_CONCURRENCY` / `CI_SUMMARY_CONCURRENCY` (worker, defaults 4 / 1 / 2), `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (PEM, `\n`-escaped), `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` (the App's OAuth client, for web sign-in), `GITHUB_APP_SLUG` (install links), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (web), `API_JWT_SECRET` (web and api), `API_RATE_LIMIT_PER_MINUTE` (api, default 120), `API_BASE_URL`, `MERGEMIND_E2E` (test-only sign-in seam, refused in production), `GROQ_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OLLAMA_BASE_URL`, `LLM_PRIMARY_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_LOCAL_MODEL`, `LLM_TIMEOUT_MS`, `EMBEDDING_MODEL` (default `nomic-embed-text`), `INDEX_MAX_FILES` / `INDEX_MAX_FILE_BYTES` (defaults 1,500 / 200,000), `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`, `LANGFUSE_REDACT_INPUTS`, `SMEE_URL`.
 
 ---
 

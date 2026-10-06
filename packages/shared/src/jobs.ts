@@ -21,8 +21,11 @@ export const ReviewPrJobDataSchema = z.object({
   isDraft: z.boolean(),
   trigger: z.enum(REVIEW_TRIGGERS),
   githubUpdatedAt: z.iso.datetime({ offset: true }),
+  /** 1 for webhook-driven reviews; a manual rerun uses the next attempt (ADR-031). */
+  attempt: z.number().int().positive().default(1),
 });
 export type ReviewPrJobData = z.infer<typeof ReviewPrJobDataSchema>;
+export type ReviewPrJobInput = z.input<typeof ReviewPrJobDataSchema>;
 
 export type ReviewJobIdInput = {
   githubRepoId: number;
@@ -49,7 +52,7 @@ export function buildReviewJobId({
   return attempt > 1 ? `${base}-a${attempt}` : base;
 }
 
-export const INDEX_TRIGGERS = ['push', 'installation'] as const;
+export const INDEX_TRIGGERS = ['push', 'installation', 'manual'] as const;
 export type IndexTrigger = (typeof INDEX_TRIGGERS)[number];
 
 /** Data carried by an `index.repo` job (PRD F6). */
@@ -66,8 +69,24 @@ export const IndexRepoJobDataSchema = z.object({
 });
 export type IndexRepoJobData = z.infer<typeof IndexRepoJobDataSchema>;
 
-/** `<githubRepoId>@<commitSha>`, or `<githubRepoId>@initial` for the first index (ADR-024). */
-export function buildIndexJobId(input: { githubRepoId: number; commitSha: string | null }): string {
+/**
+ * `<githubRepoId>@<commitSha>`, `<githubRepoId>@initial` for the first index (ADR-024), or
+ * `<githubRepoId>@manual-<yyyymmddHHMM>` for a reindex asked from the UI: one per minute, so a
+ * double click is deduplicated but a later reindex is not (ADR-031).
+ */
+export function buildIndexJobId(input: {
+  githubRepoId: number;
+  commitSha: string | null;
+  trigger?: IndexTrigger;
+  requestedAt?: Date;
+}): string {
+  if (input.trigger === 'manual') {
+    const minute = (input.requestedAt ?? new Date())
+      .toISOString()
+      .slice(0, 16)
+      .replace(/[-T:]/g, '');
+    return `${input.githubRepoId}@manual-${minute}`;
+  }
   return `${input.githubRepoId}@${input.commitSha ?? 'initial'}`;
 }
 

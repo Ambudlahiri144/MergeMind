@@ -129,6 +129,13 @@ export class UpstreamError extends AppError {
   }
 }
 
+/** A feature the server is not configured for (e.g. API auth or the GitHub App is unset). */
+export class ServiceUnavailableError extends AppError {
+  readonly status = 503;
+  readonly code = 'unavailable';
+  readonly title = 'Service Unavailable';
+}
+
 /** Wraps a failed Zod parse as a 400 with one issue per invalid field. */
 export function validationErrorFromZod(message: string, error: z.ZodError): ValidationError {
   const issues = error.issues.map((issue) => ({

@@ -35,7 +35,8 @@
     "src/**/*.tsx",
     ".next/types/**/*.ts",
     "next.config.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "playwright.config.ts"
   ],
   "exclude": ["node_modules"]
 }

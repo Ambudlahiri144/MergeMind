@@ -24,6 +24,11 @@ export type UsageLedgerRepository = {
   record(rows: readonly UsageRow[]): Promise<void>;
   /** Input + output tokens for the installation in a `YYYY-MM` period (budget check, F9). */
   sumTokensForPeriod(installationId: string, period: string): Promise<number>;
+  /** The same total split by kind (review, embed, ci_summary) for the usage line. */
+  sumTokensByKindForPeriod(
+    installationId: string,
+    period: string,
+  ): Promise<Record<UsageKind, number>>;
   countForRun(reviewRunId: string): Promise<number>;
 };
 
@@ -53,6 +58,20 @@ export function createUsageLedgerRepository(): UsageLedgerRepository {
         { $group: { _id: null, total: { $sum: { $add: ['$inputTokens', '$outputTokens'] } } } },
       ]);
       return result?.total ?? 0;
+    },
+
+    async sumTokensByKindForPeriod(installationId, period) {
+      const rows = await UsageLedgerModel.aggregate<{ _id: UsageKind; total: number }>([
+        { $match: { installationId: new Types.ObjectId(installationId), period } },
+        {
+          $group: { _id: '$kind', total: { $sum: { $add: ['$inputTokens', '$outputTokens'] } } },
+        },
+      ]);
+      const totals: Record<UsageKind, number> = { review: 0, embed: 0, ci_summary: 0 };
+      for (const row of rows) {
+        totals[row._id] = row.total;
+      }
+      return totals;
     },
 
     async countForRun(reviewRunId) {

@@ -112,6 +112,8 @@ export type FakeGithub = {
   pullStates: Map<string, { state: 'open' | 'closed'; headSha: string }>;
   /** PR conversation comments (issue comments), with how often each was edited. */
   issueComments: FakeIssueComment[];
+  /** `org:username` -> membership; a missing key answers 404 (not a member). */
+  orgMemberships: Map<string, { role: 'admin' | 'member'; state: 'active' | 'pending' }>;
   /** Make the next `times` requests matching method + path regex fail with `status`. */
   failNext(method: string, pattern: RegExp, status: number, times?: number): void;
   reset(): void;
@@ -143,6 +145,7 @@ export function createFakeGithub(): FakeGithub {
     commitPulls: new Map(),
     pullStates: new Map(),
     issueComments: [],
+    orgMemberships: new Map(),
     failNext(method, pattern, status, times = 1) {
       faults.push({ method, pattern, status, remaining: times });
     },
@@ -167,6 +170,7 @@ export function createFakeGithub(): FakeGithub {
       fake.commitPulls.clear();
       fake.pullStates.clear();
       fake.issueComments.length = 0;
+      fake.orgMemberships.clear();
       faults.length = 0;
     },
   };
@@ -485,6 +489,15 @@ export function createFakeGithub(): FakeGithub {
             state: state.state,
             head: { sha: state.headSha },
           });
+    }),
+
+    http.get(`${API}/orgs/:org/memberships/:username`, ({ params }) => {
+      const membership = fake.orgMemberships.get(
+        `${String(params.org)}:${String(params.username)}`,
+      );
+      return membership === undefined
+        ? HttpResponse.json({ message: 'Not Found' }, { status: 404 })
+        : HttpResponse.json({ ...membership, organization: { login: String(params.org) } });
     }),
 
     http.get(`${API}/repos/:owner/:repo/issues/:number/comments`, ({ params, request }) => {

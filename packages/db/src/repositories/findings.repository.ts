@@ -65,7 +65,12 @@ export type FindingsRepository = {
   countOpenBySeverity(
     pullRequestId: string,
   ): Promise<{ critical: number; major: number; minor: number }>;
+  findById(findingId: string): Promise<(FindingView & FindingScope) | null>;
+  /** Open -> dismissed (PRD F8); false when it was not open (already dismissed or resolved). */
+  dismiss(findingId: string): Promise<boolean>;
 };
+
+export type FindingScope = { pullRequestId: string; repositoryId: string };
 
 type LeanFinding = FindingRecord & { _id: Types.ObjectId };
 
@@ -211,6 +216,29 @@ export function createFindingsRepository(): FindingsRepository {
         counts[row._id] = row.count;
       }
       return counts;
+    },
+
+    async findById(findingId) {
+      const doc = await FindingModel.findOne(
+        { _id: new Types.ObjectId(findingId) },
+        { createdAt: 0, updatedAt: 0, __v: 0 },
+      ).lean<LeanFinding>();
+      if (!doc) {
+        return null;
+      }
+      return {
+        ...toView(doc),
+        pullRequestId: doc.pullRequestId.toString(),
+        repositoryId: doc.repositoryId.toString(),
+      };
+    },
+
+    async dismiss(findingId) {
+      const result = await FindingModel.updateOne(
+        { _id: new Types.ObjectId(findingId), state: 'open' },
+        { $set: { state: 'dismissed' } },
+      );
+      return result.modifiedCount > 0;
     },
   };
 }

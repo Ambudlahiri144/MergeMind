@@ -32,7 +32,7 @@ The Taste-skill itself says it is for landing pages and portfolios, **not** dens
 ## 2. Foundations
 
 ### 2.1 Design system
-- **shadcn/ui** components (owned code in `apps/web/src/components/ui`), **customized**: never ship the default state. One system only. No Material, Radix Themes, or Primer mixed in.
+- **shadcn/ui** components (owned code in `apps/web/src/components/ui`), **customized**: never ship the default state. One system only. No Material, Radix Themes, or Primer mixed in. Phase 6 writes them in the shadcn way (`cva` variants + `cn`), and the dialog is the native `<dialog>` (focus trap and Escape built in), so no primitive library is needed yet (ADR-029).
 - **Tailwind v4** with `@tailwindcss/postcss`. Tokens are defined as CSS variables in `apps/web/src/app/globals.css` under `@theme`.
 - **Icons:** `@phosphor-icons/react`, **Regular** weight in UI, **Bold** for emphasis, size 16/20. No Lucide (shadcn's default; replace on install), no hand-drawn SVG icons.
 - **Fonts:** `geist` package via `next/font` (Geist Sans + Geist Mono). No Inter, Roboto, Open Sans, and **no serif** anywhere.
@@ -147,7 +147,7 @@ Hierarchy comes from weight and color, not raw size. No oversized H1s inside the
 
 | Route | Screen | Purpose |
 |---|---|---|
-| `/` | Landing | Explain and convert: install the GitHub App |
+| `/` | Landing | Explain and convert: install the GitHub App. Phase 6 ships a minimal page (headline, one line, Install on GitHub, Sign in); the full landing below arrives in Phase 7 with real screenshots |
 | `/signin` | Sign in | "Continue with GitHub" |
 | `/repos` | Repositories | Enabled repos, last review, toggle, reindex |
 | `/repos/[repoId]` | Repository | Open PRs with latest run status, effective policy link |
