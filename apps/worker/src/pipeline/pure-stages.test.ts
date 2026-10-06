@@ -104,6 +104,7 @@ describe('classifyFindings', () => {
   const options = {
     suppressed: new Set<string>(),
     alreadyReported: new Set<string>(),
+    openIssues: [],
     minConfidence: 0.7,
     maxInlineComments: 25,
   };
@@ -273,6 +274,33 @@ describe('classifyFindings', () => {
 
       expect(toStore).toEqual([]);
       expect(counts).toMatchObject({ duplicate: 1, merged: 1, critical: 1 });
+    });
+
+    it('does not re-post an open issue from an earlier run that another pass restates', () => {
+      // Live PR #2 (2026-10-06): run 1 kept correctness's hard-coded key; run 2's security
+      // pass reported it again under a different fingerprint and it was posted twice.
+      const secret = candidate({ category: 'hardcoded-secret', title: 'Key in source' });
+      const { prepared } = prepareFindings([secret], filesByPath);
+
+      const { toStore, counts } = classifyFindings(prepared, {
+        ...options,
+        openIssues: [{ path: 'src/a.ts', category: 'hardcoded-secret', lineStart: 3, lineEnd: 3 }],
+      });
+
+      expect(toStore).toEqual([]);
+      expect(counts).toMatchObject({ duplicate: 1, critical: 1 });
+    });
+
+    it('still posts an open issue category restated on other lines', () => {
+      const secret = candidate({ category: 'hardcoded-secret', title: 'Key in source' });
+      const { prepared } = prepareFindings([secret], filesByPath);
+
+      const { toStore } = classifyFindings(prepared, {
+        ...options,
+        openIssues: [{ path: 'src/a.ts', category: 'hardcoded-secret', lineStart: 9, lineEnd: 9 }],
+      });
+
+      expect(toStore.map((f) => f.title)).toEqual(['Key in source']);
     });
 
     it('treats a restatement of a suppressed issue as suppressed too', () => {

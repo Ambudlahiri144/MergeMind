@@ -48,6 +48,7 @@ import {
   COMPARE_FALLBACK_REASONS,
   changedHeadLines,
   countHunkChanges,
+  currentIssueRegions,
   findResolvedFindings,
   scopeToChanges,
 } from './incremental.js';
@@ -376,13 +377,15 @@ async function analyze(
 
   const { prepared, droppedCount } = prepareFindings(result.findings, filesByPath);
   const fingerprints = prepared.map((finding) => finding.fingerprint);
-  const [suppressed, alreadyReported] = await Promise.all([
+  const [suppressed, alreadyReported, openFindings] = await Promise.all([
     deps.suppressions.findSuppressed(base.repository.id, fingerprints),
     deps.findings.findExistingFingerprints(base.pullRequest.id, fingerprints),
+    deps.findings.listOpenForPr(base.pullRequest.id, run.id),
   ]);
   const { toStore, counts } = classifyFindings(prepared, {
     suppressed,
     alreadyReported,
+    openIssues: currentIssueRegions(openFindings, scope.compareFiles),
     minConfidence: policy.policy.review.minConfidence,
     maxInlineComments: deps.config.maxInlineComments,
   });
@@ -396,7 +399,7 @@ async function analyze(
   if (scope.mode === 'incremental') {
     const minConfidence = policy.policy.review.minConfidence;
     const resolved = findResolvedFindings({
-      openFindings: await deps.findings.listOpenForPr(base.pullRequest.id, run.id),
+      openFindings,
       compareFiles: scope.compareFiles,
       currentIssues: prepared.filter((finding) => finding.confidence >= minConfidence),
     });

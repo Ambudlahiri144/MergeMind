@@ -623,13 +623,15 @@ describe('incremental re-review (PRD F5)', () => {
   }
 
   /** Run 1 (full) on both files; then the push to HEAD_2 fixes the missing await only. */
-  async function reviewThenPush(scenario: Scenario) {
+  async function reviewThenPush(
+    scenario: Scenario,
+    firstFindings: Script = {
+      security: [SQL_INJECTION],
+      correctness: [MISSING_AWAIT],
+    },
+  ) {
     setPrFiles(scenario, SAVE_V1);
-    const first = await runReview(
-      scenario.data,
-      meta(),
-      buildDeps(createFakeLlm({ security: [SQL_INJECTION], correctness: [MISSING_AWAIT] })),
-    );
+    const first = await runReview(scenario.data, meta(), buildDeps(createFakeLlm(firstFindings)));
     setPrFiles(scenario, SAVE_V2);
     fakeGithub.compares.set(`${scenario.repoFullName}:${HEAD_SHA}...${HEAD_2}`, {
       status: 'ahead',
@@ -739,6 +741,43 @@ describe('incremental re-review (PRD F5)', () => {
     expect(fakeGithub.replies.filter((reply) => reply.repo === scenario.repoFullName)).toHaveLength(
       0,
     );
+  });
+
+  it('does not re-post an open finding that another pass restates after a push', async () => {
+    // Live PR #2 (2026-10-06): run 1 kept correctness's hard-coded key; after the push the
+    // security pass reported the same key under a new fingerprint and it was posted again.
+    const scenario = await createScenario();
+    const key = {
+      ...MISSING_AWAIT,
+      severity: 'critical' as const,
+      category: 'hardcoded-secret' as const,
+      lineStart: 1,
+      lineEnd: 1,
+      title: 'Live API key hardcoded in source',
+    };
+    const { pushData } = await reviewThenPush(scenario, {
+      security: [SQL_INJECTION],
+      correctness: [key, MISSING_AWAIT],
+    });
+
+    const second = await runReview(
+      pushData,
+      meta(),
+      buildDeps(
+        createFakeLlm({
+          security: [{ ...key, title: 'Hardcoded live API key exposed' }],
+          correctness: [],
+        }),
+      ),
+    );
+
+    expect(reviewsFor(scenario)).toHaveLength(1);
+    expect((await repos.reviewRuns.findById(second.runId ?? ''))?.counts).toMatchObject({
+      critical: 2,
+      major: 0,
+      duplicate: 1,
+      resolved: 1,
+    });
   });
 
   it('falls back to a full review after a force-push GitHub cannot compare', async () => {

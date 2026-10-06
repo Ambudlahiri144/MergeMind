@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   changedHeadLines,
+  currentIssueRegions,
   findResolvedFindings,
   isFindingTouched,
   mapOldLineToNew,
@@ -196,5 +197,21 @@ describe('findResolvedFindings', () => {
     });
 
     expect(resolved.map((f) => f.id)).toEqual(['f1', 'f2']);
+  });
+});
+
+describe('currentIssueRegions', () => {
+  it('moves open findings to their head-side lines and drops deleted files', () => {
+    const below = finding({ id: 'f2', lineStart: 7, lineEnd: 8 });
+    const untouched = finding({ id: 'f3', path: 'src/a.ts', lineStart: 4, lineEnd: 4 });
+    const gone = finding({ id: 'f4', path: 'src/gone.ts' });
+    const deleted = diff('src/gone.ts', '@@ -1 +0,0 @@\n-x', 'removed');
+
+    const regions = currentIssueRegions([below, untouched, gone], [COMPARE, deleted]);
+
+    expect(regions).toEqual([
+      { path: 'src/b.ts', category: 'missing-await', lineStart: 9, lineEnd: 10 },
+      { path: 'src/a.ts', category: 'missing-await', lineStart: 4, lineEnd: 4 },
+    ]);
   });
 });

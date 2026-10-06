@@ -124,10 +124,7 @@ export type ResolutionInput = {
  * not re-reporting unchanged code proves nothing.
  */
 export function findResolvedFindings(input: ResolutionInput): FindingView[] {
-  const byOldPath = new Map<string, FileDiff>();
-  for (const file of input.compareFiles) {
-    byOldPath.set(file.previousPath ?? file.path, file);
-  }
+  const byOldPath = byPreviousPath(input.compareFiles);
   const currentFingerprints = new Set(input.currentIssues.map((issue) => issue.fingerprint));
 
   return input.openFindings.filter((finding) => {
@@ -141,13 +138,45 @@ export function findResolvedFindings(input: ResolutionInput): FindingView[] {
     if (currentFingerprints.has(finding.fingerprint)) {
       return false;
     }
-    const moved: IssueRegion = {
-      path: compareFile.path,
-      category: finding.category,
-      lineStart: mapOldLineToNew(compareFile, finding.lineStart),
-      lineEnd: mapOldLineToNew(compareFile, finding.lineEnd),
-    };
+    const moved = movedRegion(finding, compareFile);
     return !input.currentIssues.some((issue) => isSameIssue(issue, moved));
+  });
+}
+
+function byPreviousPath(compareFiles: readonly FileDiff[]): Map<string, FileDiff> {
+  const byOldPath = new Map<string, FileDiff>();
+  for (const file of compareFiles) {
+    byOldPath.set(file.previousPath ?? file.path, file);
+  }
+  return byOldPath;
+}
+
+function movedRegion(finding: FindingView, compareFile: FileDiff): IssueRegion {
+  return {
+    path: compareFile.path,
+    category: finding.category,
+    lineStart: mapOldLineToNew(compareFile, finding.lineStart),
+    lineEnd: mapOldLineToNew(compareFile, finding.lineEnd),
+  };
+}
+
+/**
+ * Where earlier open findings sit at the new head, so a restatement by another pass (a new
+ * fingerprint) is not posted again. Findings of deleted files are dropped; with no compare
+ * diff (full review) positions are kept as stored.
+ */
+export function currentIssueRegions(
+  openFindings: readonly FindingView[],
+  compareFiles: readonly FileDiff[],
+): IssueRegion[] {
+  const byOldPath = byPreviousPath(compareFiles);
+  return openFindings.flatMap((finding) => {
+    const compareFile = byOldPath.get(finding.path);
+    if (!compareFile) {
+      const { path, category, lineStart, lineEnd } = finding;
+      return [{ path, category, lineStart, lineEnd }];
+    }
+    return compareFile.status === 'removed' ? [] : [movedRegion(finding, compareFile)];
   });
 }
 

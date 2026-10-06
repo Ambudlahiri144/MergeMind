@@ -59,6 +59,8 @@ export type ClassifyOptions = {
   suppressed: ReadonlySet<string>;
   /** Fingerprints this PR already has from an earlier run. */
   alreadyReported: ReadonlySet<string>;
+  /** Open findings from earlier runs at their head-side lines (cross-run restatements). */
+  openIssues: readonly IssueRegion[];
   minConfidence: number;
   maxInlineComments: number;
 };
@@ -153,7 +155,10 @@ export function classifyFindings(
       claimed.push(finding);
       continue;
     }
-    if (options.alreadyReported.has(finding.fingerprint)) {
+    const isReported =
+      options.alreadyReported.has(finding.fingerprint) ||
+      (isConfident && isRestatement(finding, options.openIssues));
+    if (isReported) {
       if (isConfident) {
         counts.duplicate += 1;
         counts[finding.severity] += 1;
