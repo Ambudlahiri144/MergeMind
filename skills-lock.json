@@ -13,6 +13,12 @@
       "skillPath": "skills/minimalist-skill/SKILL.md",
       "computedHash": "7e88897e0371184e97a82b8d9ef080323c13f21eb067b58ef71eb05173a08ac2"
     },
+    "neobrutalist-web-designer": {
+      "source": "erichowens/some_claude_skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/neobrutalist-web-designer/SKILL.md",
+      "computedHash": "35a6e34e370bbef77678f3f580943fb285ef952dbc82f1ae1ba833c80df1c203"
+    },
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
       "sourceType": "github",

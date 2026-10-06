@@ -11,6 +11,7 @@ import { rerunReview } from '@/app/actions/mutations';
 import { ActionForm } from '@/components/action-form';
 import { ErrorPanel } from '@/components/error-panel';
 import { RunTimeline } from '@/components/run-timeline';
+import { buttonVariants } from '@/components/ui/button';
 import { GateResult } from '@/components/ui/severity';
 import { EmptyState, PageHeader } from '@/components/ui/states';
 import { shortSha } from '@/lib/format';
@@ -36,7 +37,7 @@ export default async function PullRequestPage(props: PageProps<'/repos/[repoId]/
   return (
     <>
       <p className="pb-2 text-xs text-text-muted">
-        <Link href={`/repos/${repoId}`} className="hover:text-accent">
+        <Link href={`/repos/${repoId}`} className="underline-offset-2 hover:underline decoration-2">
           {data.repository.fullName}
         </Link>
       </p>
@@ -51,15 +52,15 @@ export default async function PullRequestPage(props: PageProps<'/repos/[repoId]/
         actions={
           <a
             href={data.htmlUrl}
-            className="inline-flex h-10 items-center gap-2 rounded-md px-3 font-medium text-accent hover:bg-surface-muted"
+            className={buttonVariants({ variant: 'secondary', size: 'touch' })}
           >
-            View on GitHub <ArrowSquareOut size={16} aria-hidden="true" />
+            View on GitHub <ArrowSquareOut size={16} weight="bold" aria-hidden="true" />
           </a>
         }
       />
       <div className="flex flex-col gap-6">
         {latest ? (
-          <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex flex-col gap-3 rounded-base border-2 border-border bg-surface shadow-hard p-4 md:flex-row md:items-start md:justify-between">
             <GateResult conclusion={latest.gateConclusion} counts={latest.counts} />
             {canRerun ? (
               <ActionForm
@@ -72,7 +73,7 @@ export default async function PullRequestPage(props: PageProps<'/repos/[repoId]/
           </div>
         ) : null}
         <section aria-labelledby="runs-heading">
-          <h2 id="runs-heading" className="pb-3 text-lg leading-7 font-semibold">
+          <h2 id="runs-heading" className="pb-3 text-lg leading-7 font-bold">
             Review runs
           </h2>
           {data.runs.length === 0 ? (

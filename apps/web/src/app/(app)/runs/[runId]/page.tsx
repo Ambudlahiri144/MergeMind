@@ -47,13 +47,16 @@ export default async function RunPage(props: PageProps<'/runs/[runId]'>) {
   return (
     <>
       <p className="pb-2 text-xs text-text-muted">
-        <Link href={`/repos/${data.repository.id}`} className="hover:text-accent">
+        <Link
+          href={`/repos/${data.repository.id}`}
+          className="underline-offset-2 hover:underline decoration-2"
+        >
           {data.repository.fullName}
         </Link>
         {' / '}
         <Link
           href={`/repos/${data.repository.id}/pulls/${String(data.pullRequest.number)}`}
-          className="hover:text-accent"
+          className="underline-offset-2 hover:underline decoration-2"
         >
           #{data.pullRequest.number} {data.pullRequest.title}
         </Link>
@@ -78,7 +81,7 @@ export default async function RunPage(props: PageProps<'/runs/[runId]'>) {
           ) : null
         }
       />
-      <div className="mb-6 flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+      <div className="mb-6 flex flex-col gap-2 rounded-base border-2 border-border bg-surface shadow-hard p-4">
         <p aria-live="polite" className="sr-only">
           Run status: {status}
         </p>
@@ -115,7 +118,7 @@ export default async function RunPage(props: PageProps<'/runs/[runId]'>) {
               }
               return (
                 <section key={severity} aria-labelledby={`group-${severity}`}>
-                  <h2 id={`group-${severity}`} className="pb-3 text-lg leading-7 font-semibold">
+                  <h2 id={`group-${severity}`} className="pb-3 text-lg leading-7 font-bold">
                     {GROUP_LABEL[severity]}{' '}
                     <span className="font-normal text-text-muted">{group.length}</span>
                   </h2>

@@ -26,7 +26,7 @@ export function ThemeToggle({ initial }: { initial: Theme }) {
       type="button"
       aria-label={`${LABEL[theme]}. Switch theme`}
       title={LABEL[theme]}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-surface-muted hover:text-text"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-base border-2 border-transparent text-text-muted hover:border-border hover:bg-surface-muted hover:text-text"
       onClick={() => {
         const next = NEXT[theme];
         setTheme(next);
@@ -38,7 +38,7 @@ export function ThemeToggle({ initial }: { initial: Theme }) {
         document.cookie = `${THEME_COOKIE}=${next}; Max-Age=${String(ONE_YEAR_SECONDS)}; Path=/; SameSite=Lax`;
       }}
     >
-      <Icon size={20} aria-hidden="true" />
+      <Icon size={20} weight="bold" aria-hidden="true" />
     </button>
   );
 }

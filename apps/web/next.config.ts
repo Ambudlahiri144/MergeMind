@@ -26,13 +26,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // No dev badge in E2E runs (it would show up in the landing-page screenshots).
   ...(process.env.MERGEMIND_E2E === '1' ? { devIndicators: false as const } : {}),
+  // Turbopack has no custom export conditions and cannot map shared's `.js` specifiers to
+  // `.ts`, so the web reads `@mergemind/shared` from its dist. The web's predev, prebuild,
+  // pretest:e2e and prescreenshots scripts rebuild it first (ADR-035).
   turbopack: {
     root: repoRoot,
-    // Turbopack has no custom export conditions, so the `@mergemind/source` condition
-    // (ADR-015) is spelled as an alias: the web reads shared's TypeScript, never a stale dist.
-    resolveAlias: {
-      '@mergemind/shared': './packages/shared/src/index.ts',
-    },
   },
 };
 

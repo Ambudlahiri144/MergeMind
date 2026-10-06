@@ -10,11 +10,13 @@ export function ErrorPanel({ problem, action }: { problem: Problem; action?: Rea
   return (
     <div
       role="alert"
-      className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 md:flex-row md:items-start"
+      className="flex flex-col gap-3 rounded-base border-2 border-border bg-surface p-4 shadow-hard md:flex-row md:items-start"
     >
-      <WarningCircle size={20} className="mt-0.5 shrink-0 text-sev-critical" aria-hidden="true" />
+      <span className="grid size-9 shrink-0 place-items-center rounded-base border-2 border-border bg-sev-critical-bg text-on-fill">
+        <WarningCircle size={20} weight="bold" aria-hidden="true" />
+      </span>
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">{problem.title}</p>
+        <p className="font-bold">{problem.title}</p>
         <p className="mt-1 text-text-muted">{problem.detail}</p>
         {problem.requestId ? (
           <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted">

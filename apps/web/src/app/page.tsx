@@ -6,9 +6,11 @@ import {
   ShieldWarningIcon as ShieldWarning,
   WrenchIcon as Wrench,
 } from '@phosphor-icons/react/dist/ssr';
+import type { Icon } from '@phosphor-icons/react';
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 import { ThemedShot } from '@/components/landing/themed-shot';
 import { buttonVariants } from '@/components/ui/button';
@@ -25,9 +27,9 @@ import reviewLight from '../../public/screens/github-review-light.png';
 import heroDark from '../../public/screens/hero-dark.png';
 import heroLight from '../../public/screens/hero-light.png';
 
-// Design.md §5 landing (Taste-skill in full; UI/UX Pro Max "Hero + Features + CTA" pattern
-// under Design.md's tokens). Dials: variance 3, motion 3, density 4. One accent, no eyebrows,
-// one label per intent: "Install on GitHub" everywhere.
+// Design.md §5 landing, the loud surface of the neo-brutalist system (ADR-036): flat colour
+// bands, ink borders, hard shadows. Real screenshots only, no eyebrows, and one label per
+// intent: "Install on GitHub" everywhere.
 
 export const metadata: Metadata = {
   title: { absolute: 'MergeMind: AI code review for every pull request' },
@@ -37,6 +39,10 @@ export const metadata: Metadata = {
 
 const REPO_URL = 'https://github.com/Ambudlahiri144/MergeMind';
 const SAMPLE_REVIEW_URL = 'https://github.com/Ambudlahiri144/dev_portfolio/pull/2';
+
+const CONTAINER = 'mx-auto max-w-6xl px-4 md:px-6';
+const SECTION_TITLE = 'text-4xl leading-[1.05] font-bold tracking-[-0.03em] md:text-5xl';
+const CARD = 'min-w-0 rounded-base border-2 border-border p-6 shadow-hard';
 
 const STEPS = [
   {
@@ -56,37 +62,60 @@ const STEPS = [
   },
 ] as const;
 
+/** A highlighted word in a heading: the marker-pen accent of the style. */
+function Marker({ children }: { children: ReactNode }) {
+  return (
+    <span className="rounded-base border-2 border-border bg-main px-2 text-on-fill">
+      {children}
+    </span>
+  );
+}
+
+function IconTile({ icon: IconComponent, className }: { icon: Icon; className?: string }) {
+  return (
+    <span
+      className={cn(
+        'grid size-10 shrink-0 place-items-center rounded-base border-2 border-border bg-surface text-text',
+        className,
+      )}
+    >
+      <IconComponent size={22} weight="bold" aria-hidden="true" />
+    </span>
+  );
+}
+
 function Nav({ isSignedIn }: { isSignedIn: boolean }) {
   return (
     <header
-      className="sticky top-0 border-b border-border bg-bg/90 backdrop-blur"
+      className="sticky top-0 border-b-2 border-border bg-surface"
       style={{ zIndex: Z_INDEX.header }}
     >
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 md:px-6">
-        <Link href="/" className="flex h-10 items-center gap-2 font-semibold">
-          <GitPullRequest size={20} weight="bold" className="text-accent" aria-hidden="true" />
+      <div className={cn(CONTAINER, 'flex h-16 items-center gap-6')}>
+        <Link href="/" className="flex h-10 items-center gap-2 text-lg font-bold">
+          <span className="grid size-8 place-items-center rounded-base border-2 border-border bg-main text-on-fill shadow-hard-sm">
+            <GitPullRequest size={18} weight="bold" aria-hidden="true" />
+          </span>
           MergeMind
         </Link>
         <nav aria-label="Sections" className="hidden md:block">
-          <ul className="flex items-center gap-1 text-text-muted">
-            <li>
-              <a href="#how" className="flex h-10 items-center rounded-md px-3 hover:text-text">
-                How it works
-              </a>
-            </li>
-            <li>
-              <a href="#checks" className="flex h-10 items-center rounded-md px-3 hover:text-text">
-                What it checks
-              </a>
-            </li>
-            <li>
-              <a href={REPO_URL} className="flex h-10 items-center rounded-md px-3 hover:text-text">
-                GitHub
-              </a>
-            </li>
+          <ul className="flex items-center gap-1 font-bold text-text-muted">
+            {[
+              ['How it works', '#how'],
+              ['What it checks', '#checks'],
+              ['GitHub', REPO_URL],
+            ].map(([label, href]) => (
+              <li key={label}>
+                <a
+                  href={href}
+                  className="flex h-10 items-center px-3 decoration-2 underline-offset-4 hover:text-text hover:underline"
+                >
+                  {label}
+                </a>
+              </li>
+            ))}
           </ul>
         </nav>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-3">
           <Link
             href={isSignedIn ? '/repos' : '/signin'}
             className={cn(
@@ -113,74 +142,87 @@ export default async function LandingPage() {
     <>
       <a
         href="#main"
-        className="sr-only rounded-md bg-surface px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+        className="sr-only rounded-base border-2 border-border bg-main px-3 py-2 font-bold text-on-fill focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
         style={{ zIndex: Z_INDEX.toast }}
       >
         Skip to content
       </a>
       <Nav isSignedIn={viewer !== null} />
       <main id="main" className="text-base leading-[26px]">
-        {/* Hero: left-aligned split, copy left, real product screenshot right. */}
-        <section className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] gap-12 px-4 pt-16 pb-16 md:px-6 md:pt-24 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
-          <div>
-            <h1 className="text-4xl leading-[1.1] font-semibold tracking-[-0.02em] md:text-5xl">
-              Code review that never sleeps.
-            </h1>
-            <p className="mt-5 max-w-[46ch] text-text-muted">
-              MergeMind reviews every pull request for security, correctness and maintainability,
-              and explains failed CI runs in plain words.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a
-                href={installUrl()}
-                className={buttonVariants({ variant: 'primary', size: 'touch' })}
-              >
-                Install on GitHub
-              </a>
-              <a
-                href={SAMPLE_REVIEW_URL}
-                className={buttonVariants({ variant: 'secondary', size: 'touch' })}
-              >
-                See a sample review
-              </a>
+        {/* Hero: a lemon band, copy left, the real product screenshot in a heavy frame right. */}
+        <section className="scope-fill border-b-2 border-border bg-main">
+          <div
+            className={cn(
+              CONTAINER,
+              'grid grid-cols-[minmax(0,1fr)] gap-12 pt-16 pb-20 md:pt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center',
+            )}
+          >
+            <div>
+              <h1 className="text-5xl leading-[0.95] font-bold tracking-[-0.04em] md:text-6xl lg:text-[64px]">
+                Code review that never sleeps.
+              </h1>
+              <p className="mt-6 max-w-[42ch] text-lg leading-7">
+                MergeMind reviews every pull request for security, correctness and maintainability,
+                and explains failed CI runs in plain words.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-4">
+                <a
+                  href={installUrl()}
+                  className={buttonVariants({ variant: 'ink', size: 'touch' })}
+                >
+                  Install on GitHub
+                </a>
+                <a
+                  href={SAMPLE_REVIEW_URL}
+                  className={buttonVariants({ variant: 'secondary', size: 'touch' })}
+                >
+                  See a sample review
+                </a>
+              </div>
             </div>
+            <figure className="min-w-0">
+              <div className="overflow-hidden rounded-base border-[3px] border-border bg-surface shadow-hard-lg">
+                <ThemedShot
+                  theme={theme}
+                  light={heroLight}
+                  dark={heroDark}
+                  alt="MergeMind run page: a critical finding for a payment key committed in src/refunds.ts, with the flagged line highlighted in the code panel."
+                  sizes="(min-width: 1024px) 640px, 100vw"
+                  isPriority
+                />
+              </div>
+              <figcaption className="relative -mt-4 ml-4 inline-block -rotate-2 rounded-base border-2 border-border bg-surface px-2 py-1 font-mono text-xs font-medium shadow-hard-sm">
+                The MergeMind app, with sample data.
+              </figcaption>
+            </figure>
           </div>
-          <figure className="min-w-0">
-            <div className="overflow-hidden rounded-lg border border-border bg-surface shadow-pop">
-              <ThemedShot
-                theme={theme}
-                light={heroLight}
-                dark={heroDark}
-                alt="MergeMind run page: a critical finding for a payment key committed in src/refunds.ts, with the flagged line highlighted in the code panel."
-                sizes="(min-width: 1024px) 600px, 100vw"
-                isPriority
-              />
-            </div>
-            <figcaption className="mt-2 text-xs text-text-muted">
-              The MergeMind app, with sample data.
-            </figcaption>
-          </figure>
         </section>
 
-        {/* How a review runs: vertical stack, three verb-noun steps, one large real screenshot. */}
-        <section id="how" className="border-t border-border py-16 md:py-24">
-          <div className="mx-auto max-w-6xl px-4 md:px-6">
-            <h2 className="text-2xl leading-8 font-semibold tracking-[-0.01em] md:text-3xl md:leading-10">
-              How a review runs
+        {/* How a review runs: three numbered cards, then the real GitHub review. */}
+        <section id="how" className="border-b-2 border-border py-20 md:py-28">
+          <div className={CONTAINER}>
+            <h2 className={SECTION_TITLE}>
+              How a <Marker>review</Marker> runs
             </h2>
-            <ol className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-3">
-              {STEPS.map(({ icon: Icon, title, body }) => (
-                <li key={title} className="flex gap-3">
-                  <Icon size={24} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-                  <div>
-                    <h3 className="font-semibold">{title}</h3>
-                    <p className="mt-1 text-text-muted">{body}</p>
+            <ol className="mt-12 grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-3">
+              {STEPS.map(({ icon, title, body }, index) => (
+                <li key={title} className={cn(CARD, 'bg-surface')}>
+                  <div className="flex items-center justify-between">
+                    <IconTile icon={icon} className="bg-main text-on-fill" />
+                    <span
+                      className="font-mono text-3xl font-medium text-text-muted"
+                      aria-hidden="true"
+                    >
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
                   </div>
+                  <h3 className="mt-5 text-xl font-bold">{title}</h3>
+                  <p className="mt-2 text-text-muted">{body}</p>
                 </li>
               ))}
             </ol>
-            <figure className="mt-12">
-              <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border border-border bg-surface">
+            <figure className="mt-16">
+              <div className="mx-auto max-w-3xl overflow-hidden rounded-base border-[3px] border-border bg-surface shadow-hard-lg">
                 <ThemedShot
                   theme={theme}
                   light={reviewLight}
@@ -189,9 +231,12 @@ export default async function LandingPage() {
                   sizes="(min-width: 768px) 768px, 100vw"
                 />
               </div>
-              <figcaption className="mx-auto mt-2 max-w-3xl text-xs text-text-muted">
+              <figcaption className="mx-auto mt-4 max-w-3xl font-mono text-xs text-text-muted">
                 MergeMind on a real pull request.{' '}
-                <a href={SAMPLE_REVIEW_URL} className="text-accent underline underline-offset-2">
+                <a
+                  href={SAMPLE_REVIEW_URL}
+                  className="font-bold text-text underline decoration-2 underline-offset-2"
+                >
                   Open it on GitHub
                 </a>
               </figcaption>
@@ -199,25 +244,25 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* What it checks: bento with exactly four cells, two with real visual variation. */}
-        <section id="checks" className="border-t border-border py-16 md:py-24">
-          <div className="mx-auto max-w-6xl px-4 md:px-6">
-            <h2 className="text-2xl leading-8 font-semibold tracking-[-0.01em] md:text-3xl md:leading-10">
-              What it checks
+        {/* What it checks: a four-cell bento, each cell its own flat fill. */}
+        <section id="checks" className="border-b-2 border-border py-20 md:py-28">
+          <div className={CONTAINER}>
+            <h2 className={SECTION_TITLE}>
+              What it <Marker>checks</Marker>
             </h2>
-            <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-6">
-              <article className="flex flex-col gap-4 min-w-0 rounded-lg border border-border bg-surface p-6 md:col-span-4">
+            <div className="mt-12 grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-6">
+              <article className={cn(CARD, 'flex flex-col gap-5 bg-surface md:col-span-4')}>
                 <div>
-                  <h3 className="flex items-center gap-2 font-semibold">
-                    <ShieldWarning size={20} className="text-accent" aria-hidden="true" />
+                  <h3 className="flex items-center gap-3 text-xl font-bold">
+                    <IconTile icon={ShieldWarning} className="bg-sev-critical-bg text-on-fill" />
                     Security
                   </h3>
-                  <p className="mt-1 max-w-[52ch] text-text-muted">
+                  <p className="mt-3 max-w-[52ch] text-text-muted">
                     Injection, hardcoded secrets and unchecked input, flagged on the exact line with
                     a fix you can apply.
                   </p>
                 </div>
-                <div className="overflow-hidden rounded-lg border border-border">
+                <div className="overflow-hidden rounded-base border-2 border-border">
                   <ThemedShot
                     theme={theme}
                     light={findingLight}
@@ -227,93 +272,107 @@ export default async function LandingPage() {
                   />
                 </div>
               </article>
-              <article className="min-w-0 rounded-lg border border-border bg-accent-subtle p-6 md:col-span-2">
-                <h3 className="flex items-center gap-2 font-semibold">
-                  <BugBeetle size={20} className="text-accent" aria-hidden="true" />
+              <article className={cn(CARD, 'scope-fill bg-info md:col-span-2')}>
+                <h3 className="flex items-center gap-3 text-xl font-bold">
+                  <IconTile icon={BugBeetle} />
                   Correctness
                 </h3>
-                <p className="mt-1 text-text-muted">
+                <p className="mt-3 text-text-muted">
                   Missing awaits, null dereferences, off-by-one errors and races, judged against the
                   code your change calls.
                 </p>
               </article>
-              <article className="min-w-0 rounded-lg border border-border bg-surface p-6 md:col-span-2">
-                <h3 className="flex items-center gap-2 font-semibold">
-                  <Wrench size={20} className="text-accent" aria-hidden="true" />
+              <article className={cn(CARD, 'scope-fill bg-lavender md:col-span-2')}>
+                <h3 className="flex items-center gap-3 text-xl font-bold">
+                  <IconTile icon={Wrench} />
                   Maintainability
                 </h3>
-                <p className="mt-1 text-text-muted">
+                <p className="mt-3 text-text-muted">
                   Swallowed errors, unbounded queries and leaks. Small nits go in the summary, not
                   in your diff.
                 </p>
               </article>
-              <article className="flex flex-col gap-4 min-w-0 rounded-lg border border-border bg-surface-muted p-6 md:col-span-4">
+              <article className={cn(CARD, 'scope-fill flex flex-col gap-5 bg-main md:col-span-4')}>
                 <div>
-                  <h3 className="flex items-center gap-2 font-semibold">
-                    <ListChecks size={20} className="text-accent" aria-hidden="true" />
+                  <h3 className="flex items-center gap-3 text-xl font-bold">
+                    <IconTile icon={ListChecks} />
                     CI failures
                   </h3>
-                  <p className="mt-1 max-w-[52ch] text-text-muted">
+                  <p className="mt-3 max-w-[52ch] text-text-muted">
                     When a GitHub Actions run fails, MergeMind reads the failed job's log and posts
                     one comment with the failing step, the likely cause and the lines that show it.
                   </p>
                 </div>
                 <pre
                   tabIndex={0}
-                  className="overflow-x-auto rounded-md border border-border bg-surface p-4 font-mono text-[13px] leading-5"
+                  className="overflow-x-auto rounded-base border-2 border-border bg-surface p-4 font-mono text-[13px] leading-5"
                 >
                   <code>{`Failing step: test / Run tests
 Likely cause: the test runner cannot locate the tests
 directory, resulting in a MODULE_NOT_FOUND error.
 Evidence: line 146  # Error: Cannot find module '.../tests'`}</code>
                 </pre>
-                <p className="text-xs text-text-muted">From a real CI run on a test repository.</p>
+                <p className="font-mono text-xs text-text-muted">
+                  From a real CI run on a test repository.
+                </p>
               </article>
             </div>
           </div>
         </section>
 
-        {/* Runs on free tiers: full-width code block. */}
-        <section className="border-t border-border py-16 md:py-24">
-          <div className="mx-auto max-w-6xl px-4 md:px-6">
-            <h2 className="text-2xl leading-8 font-semibold tracking-[-0.01em] md:text-3xl md:leading-10">
-              Runs on free tiers
+        {/* Runs on free tiers: an ink terminal block. */}
+        <section className="border-b-2 border-border py-20 md:py-28">
+          <div className={CONTAINER}>
+            <h2 className={SECTION_TITLE}>
+              Runs on <Marker>free</Marker> tiers
             </h2>
-            <p className="mt-3 max-w-[60ch] text-text-muted">
+            <p className="mt-5 max-w-[60ch] text-lg leading-7 text-text-muted">
               Groq and Gemini free tiers review the code, Ollama embeds it on your machine, and
               MongoDB and Redis run in Docker.
             </p>
-            <pre
-              tabIndex={0}
-              className="mt-8 overflow-x-auto rounded-lg border border-border bg-surface-muted p-5 font-mono text-[13px] leading-6"
-            >
-              <code>{`docker compose up -d
+            <div className="mt-10 overflow-hidden rounded-base border-[3px] border-border shadow-hard-lg">
+              <p className="scope-ink border-b-2 border-border px-5 py-2 font-mono text-xs font-medium">
+                Terminal
+              </p>
+              <pre
+                tabIndex={0}
+                className="scope-ink overflow-x-auto p-5 font-mono text-[15px] leading-7"
+              >
+                <code>{`docker compose up -d
 ollama pull nomic-embed-text
 npm install
 npm run dev`}</code>
-            </pre>
+              </pre>
+            </div>
           </div>
         </section>
 
         {/* Closing call to action (one label per intent). */}
-        <section className="border-t border-border py-16 md:py-24">
-          <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 md:flex-row md:items-center md:justify-between md:px-6">
-            <h2 className="max-w-[24ch] text-2xl leading-8 font-semibold tracking-[-0.01em] md:text-3xl md:leading-10">
+        <section className="scope-fill border-b-2 border-border bg-main py-20 md:py-24">
+          <div
+            className={cn(
+              CONTAINER,
+              'flex flex-col items-start gap-8 md:flex-row md:items-center md:justify-between',
+            )}
+          >
+            <h2 className="max-w-[22ch] text-4xl leading-[1.05] font-bold tracking-[-0.03em]">
               Put a first-pass reviewer on every pull request.
             </h2>
-            <a
-              href={installUrl()}
-              className={buttonVariants({ variant: 'primary', size: 'touch' })}
-            >
+            <a href={installUrl()} className={buttonVariants({ variant: 'ink', size: 'touch' })}>
               Install on GitHub
             </a>
           </div>
         </section>
       </main>
-      <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-text-muted md:flex-row md:items-center md:justify-between md:px-6">
-          <p className="flex items-center gap-2">
-            <GitPullRequest size={16} weight="bold" className="text-accent" aria-hidden="true" />
+      <footer className="scope-ink">
+        <div
+          className={cn(
+            CONTAINER,
+            'flex flex-col gap-4 py-10 text-text-muted md:flex-row md:items-center md:justify-between',
+          )}
+        >
+          <p className="flex items-center gap-2 font-bold text-text">
+            <GitPullRequest size={18} weight="bold" aria-hidden="true" />
             MergeMind
           </p>
           <ul className="flex flex-wrap gap-x-6 gap-y-2">
@@ -324,10 +383,13 @@ npm run dev`}</code>
               ['Testing', `${REPO_URL}/blob/main/Testing.md`],
             ].map(([label, href]) => (
               <li key={label}>
-                <a href={href} className="inline-flex h-10 items-center gap-1 hover:text-text">
+                <a
+                  href={href}
+                  className="inline-flex h-10 items-center gap-1 decoration-2 underline-offset-4 hover:text-text hover:underline"
+                >
                   {label}
                   {label === 'Source on GitHub' ? (
-                    <ArrowSquareOut size={14} aria-hidden="true" />
+                    <ArrowSquareOut size={14} weight="bold" aria-hidden="true" />
                   ) : null}
                 </a>
               </li>

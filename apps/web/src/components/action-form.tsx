@@ -47,7 +47,7 @@ export function ActionForm({
       <p
         aria-live="polite"
         className={cn(
-          'min-h-5 text-xs',
+          'min-h-5 text-xs font-medium',
           result.status === 'error' ? 'text-sev-critical' : 'text-text-muted',
         )}
       >

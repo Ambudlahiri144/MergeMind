@@ -6,7 +6,7 @@ export default function Loading() {
     <div aria-busy="true" aria-label="Loading">
       <Skeleton className="h-8 w-64" />
       <Skeleton className="mt-2 h-4 w-96 max-w-full" />
-      <div className="mt-8 divide-y divide-border rounded-lg border border-border bg-surface">
+      <div className="mt-8 divide-y-2 divide-border rounded-base border-2 border-border bg-surface shadow-hard">
         {[0, 1, 2, 3].map((row) => (
           <div key={row} className="flex items-center gap-4 px-4 py-4">
             <Skeleton className="h-4 flex-1" />

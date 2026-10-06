@@ -36,7 +36,10 @@ function RepositoryRow({ repo, canAdmin }: { repo: RepositoryItem; canAdmin: boo
   return (
     <li className="grid grid-cols-[minmax(0,1fr)] gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_9rem_6rem_7rem_minmax(0,13rem)] md:items-center md:gap-4">
       <div className="min-w-0">
-        <Link href={`/repos/${repo.id}`} className="font-medium hover:text-accent">
+        <Link
+          href={`/repos/${repo.id}`}
+          className="font-medium underline-offset-2 hover:underline decoration-2"
+        >
           <span className="truncate">{repo.fullName}</span>
         </Link>
         <p className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
@@ -97,7 +100,7 @@ function InstallationSection({
   const canAdmin = installation.role !== 'member';
   return (
     <section aria-labelledby={`inst-${installation.id}`} className="py-4">
-      <h2 id={`inst-${installation.id}`} className="pb-3 text-lg leading-7 font-semibold">
+      <h2 id={`inst-${installation.id}`} className="pb-3 text-lg leading-7 font-bold">
         {installation.accountLogin}
         <span className="ml-2 text-sm font-normal text-text-muted">
           {installation.accountType === 'User' ? 'Personal account' : 'Organization'} ·{' '}
@@ -110,15 +113,15 @@ function InstallationSection({
           message="No repositories in this installation yet. Add some in the App's GitHub settings."
         />
       ) : (
-        <div className="rounded-lg border border-border bg-surface">
-          <div className="hidden border-b border-border px-4 py-2 text-xs font-medium text-text-muted md:grid md:grid-cols-[minmax(0,1fr)_9rem_6rem_7rem_minmax(0,13rem)] md:gap-4">
+        <div className="rounded-base border-2 border-border bg-surface shadow-hard">
+          <div className="hidden border-b-2 border-border px-4 py-2 text-xs font-medium text-text-muted md:grid md:grid-cols-[minmax(0,1fr)_9rem_6rem_7rem_minmax(0,13rem)] md:gap-4">
             <span>Repository</span>
             <span>Last review</span>
             <span>Pull requests</span>
             <span>Code index</span>
             <span className="text-right">Actions</span>
           </div>
-          <ul className="divide-y divide-border">
+          <ul className="divide-y-2 divide-border">
             {repos.map((repo) => (
               <RepositoryRow key={repo.id} repo={repo} canAdmin={canAdmin} />
             ))}

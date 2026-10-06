@@ -16,11 +16,13 @@ export default function AppError({
   return (
     <div
       role="alert"
-      className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 md:flex-row md:items-start"
+      className="flex flex-col gap-3 rounded-base border-2 border-border bg-surface shadow-hard p-4 md:flex-row md:items-start"
     >
-      <WarningCircle size={20} className="mt-0.5 shrink-0 text-sev-critical" aria-hidden="true" />
+      <span className="grid size-9 shrink-0 place-items-center rounded-base border-2 border-border bg-sev-critical-bg text-on-fill">
+        <WarningCircle size={20} weight="bold" aria-hidden="true" />
+      </span>
       <div className="flex-1">
-        <p className="font-semibold">Something went wrong</p>
+        <p className="font-bold">Something went wrong</p>
         <p className="mt-1 text-text-muted">
           This page could not load. Try again, and if it keeps failing, share the reference below.
         </p>

@@ -8,13 +8,13 @@ export function CopyText({ value }: { value: string }) {
   const [isCopied, setCopied] = useState(false);
   return (
     <span className="inline-flex items-center gap-1">
-      <code className="rounded bg-surface-muted px-1.5 py-0.5 font-mono text-[13px] text-text">
+      <code className="rounded-base border-2 border-border bg-surface-muted px-1.5 py-0.5 font-mono text-[13px] text-text">
         {value}
       </code>
       <button
         type="button"
         aria-label={isCopied ? 'Copied' : `Copy ${value}`}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-md hover:bg-surface-muted"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-base border-2 border-transparent hover:border-border hover:bg-surface-muted"
         onClick={() => {
           void navigator.clipboard.writeText(value).then(() => {
             setCopied(true);

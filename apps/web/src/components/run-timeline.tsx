@@ -27,12 +27,12 @@ function statusText(run: RunSummary): string {
 /** Design.md §3 run timeline: newest first; SHA, trigger, mode, status, duration, counts. */
 export function RunTimeline({ runs }: { runs: readonly RunSummary[] }) {
   return (
-    <ol className="divide-y divide-border rounded-lg border border-border bg-surface">
+    <ol className="divide-y-2 divide-border overflow-hidden rounded-base border-2 border-border bg-surface shadow-hard">
       {runs.map((run) => (
         <li key={run.id}>
           <Link
             href={`/runs/${run.id}`}
-            className="grid grid-cols-[minmax(0,1fr)] gap-1 px-4 py-3 transition-colors duration-150 hover:bg-surface-muted md:grid-cols-[7rem_minmax(0,1fr)_8rem_6rem] md:items-center md:gap-4"
+            className="grid grid-cols-[minmax(0,1fr)] gap-1 px-4 py-3 hover:bg-surface-muted md:grid-cols-[7rem_minmax(0,1fr)_8rem_6rem] md:items-center md:gap-4"
           >
             <span className="font-mono text-[13px]">
               {shortSha(run.headSha)}
@@ -42,7 +42,7 @@ export function RunTimeline({ runs }: { runs: readonly RunSummary[] }) {
               {triggerLabel(run.trigger)} · {modeLabel(run.mode)} ·{' '}
               <CountsText counts={run.counts} />
             </span>
-            <span className="font-medium">{statusText(run)}</span>
+            <span className="font-bold">{statusText(run)}</span>
             <span className="text-xs text-text-muted md:text-right">
               <time dateTime={run.createdAt}>{timeAgo(run.createdAt)}</time>
               {run.durationMs > 0 ? ` · ${duration(run.durationMs)}` : ''}

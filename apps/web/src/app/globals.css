@@ -1,78 +1,68 @@
 @import 'tailwindcss';
 
 /*
- * Design.md §2.2 tokens. Light by default; dark follows prefers-color-scheme unless the theme
- * cookie pins one (data-theme on <html>, set once in the root layout). Components use only
- * these tokens through the Tailwind theme below, never raw hex.
+ * Design.md §2.2 tokens (neo-brutalism, ADR-036). Light by default; dark follows
+ * prefers-color-scheme unless the theme cookie pins one (data-theme on <html>, set once in the
+ * root layout). Components use only these tokens through the Tailwind theme below, never raw hex.
+ *
+ * - `--border` is the ink: every border and every hard shadow. Dark mode inverts it to cream so
+ *   the outlines stay visible.
+ * - Flat fills (`--main`, `--info`, `--lavender`, `--sev-*-bg`) keep ink text in both themes.
+ * - `--sev-*-fg` are severity colours for text on a surface, tuned for AA.
  */
 :root {
-  --bg: #f6f7f9;
-  --surface: #fcfcfd;
-  --surface-muted: #eef0f3;
-  --border: #e1e4e8;
-  --text: #14161a;
-  --text-muted: #5b6370;
-  --accent: #2b54c9;
-  --accent-hover: #2346a8;
-  --accent-fg: #fcfcfd;
-  --accent-subtle: #e7edfb;
-  --sev-critical-fg: #a3261f;
-  --sev-critical-bg: #fcecea;
-  --sev-major-fg: #8a5a00;
-  --sev-major-bg: #fbf3db;
-  --sev-minor-fg: #4b5563;
-  --sev-minor-bg: #eef0f3;
-  --state-pass-fg: #2f6b3a;
-  --state-pass-bg: #eaf4ec;
-  --shadow-pop: 0 4px 16px rgb(15 17 21 / 0.06);
+  --bg: #fdf8f5;
+  --surface: #ffffff;
+  --surface-muted: #f4eee7;
+  --border: #111111;
+  --text: #111111;
+  --text-muted: #46464e;
+  --accent: #111111;
+  --main: #ffe17c;
+  --main-strong: #ffd23f;
+  --on-fill: #111111;
+  --info: #a5e3ff;
+  --lavender: #d7d2ff;
+  --sev-critical-fg: #b3261e;
+  --sev-critical-bg: #ff8a80;
+  --sev-major-fg: #8a4b00;
+  --sev-major-bg: #ffb870;
+  --sev-minor-fg: #4a4560;
+  --sev-minor-bg: #e2deff;
+  --state-pass-fg: #1e6b3a;
+  --state-pass-bg: #8ee6b2;
   color-scheme: light;
 }
 
 /* Dark values appear twice (pinned and system) because plain CSS has no mixins. */
 :root[data-theme='dark'] {
-  --bg: #0f1115;
-  --surface: #16191f;
-  --surface-muted: #1d2129;
-  --border: #2a2f38;
-  --text: #e8eaed;
-  --text-muted: #9aa3af;
-  --accent: #7393ec;
-  --accent-hover: #8da7f0;
-  --accent-fg: #0f1115;
-  --accent-subtle: #1c2540;
-  --sev-critical-fg: #f2978f;
-  --sev-critical-bg: #3a1d1b;
-  --sev-major-fg: #e8b85c;
-  --sev-major-bg: #33270f;
-  --sev-minor-fg: #aab2bd;
-  --sev-minor-bg: #22262d;
-  --state-pass-fg: #7fc68d;
-  --state-pass-bg: #18301e;
-  --shadow-pop: 0 4px 16px rgb(0 0 0 / 0.35);
+  --bg: #17171b;
+  --surface: #232329;
+  --surface-muted: #2d2d34;
+  --border: #e6e0d4;
+  --text: #f2ede4;
+  --text-muted: #c4beb4;
+  --accent: #f2ede4;
+  --sev-critical-fg: #ff9a90;
+  --sev-major-fg: #ffbe7a;
+  --sev-minor-fg: #cfc9ff;
+  --state-pass-fg: #8ee6b2;
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0f1115;
-    --surface: #16191f;
-    --surface-muted: #1d2129;
-    --border: #2a2f38;
-    --text: #e8eaed;
-    --text-muted: #9aa3af;
-    --accent: #7393ec;
-    --accent-hover: #8da7f0;
-    --accent-fg: #0f1115;
-    --accent-subtle: #1c2540;
-    --sev-critical-fg: #f2978f;
-    --sev-critical-bg: #3a1d1b;
-    --sev-major-fg: #e8b85c;
-    --sev-major-bg: #33270f;
-    --sev-minor-fg: #aab2bd;
-    --sev-minor-bg: #22262d;
-    --state-pass-fg: #7fc68d;
-    --state-pass-bg: #18301e;
-    --shadow-pop: 0 4px 16px rgb(0 0 0 / 0.35);
+    --bg: #17171b;
+    --surface: #232329;
+    --surface-muted: #2d2d34;
+    --border: #e6e0d4;
+    --text: #f2ede4;
+    --text-muted: #c4beb4;
+    --accent: #f2ede4;
+    --sev-critical-fg: #ff9a90;
+    --sev-major-fg: #ffbe7a;
+    --sev-minor-fg: #cfc9ff;
+    --state-pass-fg: #8ee6b2;
     color-scheme: dark;
   }
 }
@@ -85,9 +75,11 @@
   --color-text: var(--text);
   --color-text-muted: var(--text-muted);
   --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-fg: var(--accent-fg);
-  --color-accent-subtle: var(--accent-subtle);
+  --color-main: var(--main);
+  --color-main-strong: var(--main-strong);
+  --color-on-fill: var(--on-fill);
+  --color-info: var(--info);
+  --color-lavender: var(--lavender);
   --color-sev-critical: var(--sev-critical-fg);
   --color-sev-critical-bg: var(--sev-critical-bg);
   --color-sev-major: var(--sev-major-fg);
@@ -96,9 +88,16 @@
   --color-sev-minor-bg: var(--sev-minor-bg);
   --color-pass: var(--state-pass-fg);
   --color-pass-bg: var(--state-pass-bg);
-  --shadow-pop: var(--shadow-pop);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Hard shadows: zero blur, always the ink (Design.md §2.5). */
+  --shadow-hard-sm: 2px 2px 0 0 var(--border);
+  --shadow-hard: 4px 4px 0 0 var(--border);
+  --shadow-hard-lg: 8px 8px 0 0 var(--border);
+  --shadow-hard-main: 4px 4px 0 0 var(--main);
+  --radius-base: 5px;
+
+  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -112,17 +111,73 @@
 
   body {
     min-height: 100dvh;
-    font-size: 14px;
-    line-height: 22px;
+    font-size: 15px;
+    line-height: 24px;
+    font-weight: 500;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 700;
   }
 
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 3px solid var(--text);
     outline-offset: 2px;
   }
 
   ::selection {
-    background: var(--accent-subtle);
+    background: var(--main);
+    color: var(--on-fill);
+  }
+}
+
+/*
+ * Flat colour bands (lemon hero, bento cells, CTA) keep light-theme ink inside in both themes:
+ * a cream outline on lemon would vanish. `scope-ink` is the inverse for the footer and terminal.
+ * Both re-point the tokens, so every utility inside (borders, shadows, focus) follows.
+ */
+@utility scope-fill {
+  --border: #111111;
+  --text: #111111;
+  --text-muted: #3d3d45;
+  --accent: #111111;
+  --surface: #ffffff;
+  --surface-muted: #f4eee7;
+  color: var(--text);
+  color-scheme: light;
+}
+
+@utility scope-ink {
+  --border: #fdf8f5;
+  --text: #fdf8f5;
+  --text-muted: #d2ccc2;
+  --accent: #fdf8f5;
+  background-color: #111111;
+  color: var(--text);
+  color-scheme: dark;
+}
+
+/*
+ * The neo-brutalist press: a control sits on its hard shadow and moves onto it when pressed.
+ * Only transform and box-shadow change (Design.md §2.6).
+ */
+@utility press {
+  box-shadow: var(--shadow-hard);
+  transition-property: transform, box-shadow;
+  transition-duration: 100ms;
+  transition-timing-function: var(--ease-out-soft);
+
+  &:hover {
+    transform: translate(2px, 2px);
+    box-shadow: var(--shadow-hard-sm);
+  }
+
+  &:active {
+    transform: translate(4px, 4px);
+    box-shadow: none;
   }
 }
 

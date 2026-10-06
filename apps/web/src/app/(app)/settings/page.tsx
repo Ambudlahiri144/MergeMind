@@ -32,7 +32,7 @@ function UsageLine({ usage }: { usage: UsageResponse }) {
         tokens used this month ({percent}%)
       </span>
       {usage.state === 'ok' ? null : (
-        <span className="inline-flex items-center gap-1 rounded-full bg-sev-major-bg px-2 py-0.5 text-xs font-medium tracking-[0.04em] text-sev-major uppercase">
+        <span className="inline-flex items-center gap-1 rounded-full border-2 border-border bg-sev-major-bg px-2 py-0.5 font-mono text-xs font-medium tracking-[0.04em] text-on-fill uppercase">
           <Warning size={14} weight="bold" aria-hidden="true" />
           {usage.state === 'warn' ? 'Near budget' : 'Budget used up'}
         </span>
@@ -53,9 +53,9 @@ function InstallationSettings({
   return (
     <section
       aria-labelledby={`settings-${installation.id}`}
-      className="rounded-lg border border-border bg-surface p-4"
+      className="rounded-base border-2 border-border bg-surface shadow-hard p-4"
     >
-      <h2 id={`settings-${installation.id}`} className="text-lg leading-7 font-semibold">
+      <h2 id={`settings-${installation.id}`} className="text-lg leading-7 font-bold">
         {installation.accountLogin}
         <span className="ml-2 text-sm font-normal text-text-muted">
           {installation.status} · your role: {installation.role}
@@ -93,7 +93,7 @@ function InstallationSettings({
                 inputMode="numeric"
                 defaultValue={String(usage.data.monthlyTokenBudget)}
                 aria-describedby={`${fieldId}-help`}
-                className="h-9 w-48 rounded-md border border-border bg-surface px-3 font-mono text-[13px]"
+                className="h-9 w-48 rounded-base border-2 border-border bg-surface px-3 font-mono text-[13px]"
               />
             </ActionForm>
           ) : (

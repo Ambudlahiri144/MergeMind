@@ -7,6 +7,7 @@ import { dismissFinding, type ActionResult } from '@/app/actions/mutations';
 import { Z_INDEX } from '@/lib/z-index';
 
 import { Button } from './ui/button';
+import { FIELD } from './ui/field';
 
 const IDLE: ActionResult = { status: 'idle', message: '' };
 
@@ -33,19 +34,19 @@ export function DismissDialog({ findingId, title }: { findingId: string; title: 
       <dialog
         ref={dialog}
         aria-labelledby={`${reasonId}-title`}
-        className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface p-0 text-text shadow-pop backdrop:bg-[rgb(15_17_21/0.4)]"
+        className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-base border-[3px] border-border bg-surface p-0 text-text shadow-hard-lg backdrop:bg-black/60"
         style={{ zIndex: Z_INDEX.dialog }}
       >
         <form action={formAction} className="flex flex-col gap-4 p-6">
           <input type="hidden" name="findingId" value={findingId} />
-          <h2 id={`${reasonId}-title`} className="text-[15px] leading-[22px] font-semibold">
+          <h2 id={`${reasonId}-title`} className="text-lg leading-6 font-bold">
             Dismiss this finding?
           </h2>
           <p className="text-text-muted">
             {title}. MergeMind will stop reporting it in this repository.
           </p>
           <div className="flex flex-col gap-1">
-            <label htmlFor={reasonId} className="font-medium">
+            <label htmlFor={reasonId} className="font-bold">
               Reason
             </label>
             <span id={`${reasonId}-help`} className="text-xs text-text-muted">
@@ -57,7 +58,7 @@ export function DismissDialog({ findingId, title }: { findingId: string; title: 
               rows={3}
               maxLength={MAX_DISMISS_REASON_LENGTH}
               aria-describedby={`${reasonId}-help`}
-              className="rounded-md border border-border bg-surface px-3 py-2"
+              className={FIELD}
             />
             {result.status === 'error' ? (
               <p role="alert" className="text-xs text-sev-critical">

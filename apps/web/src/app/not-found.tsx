@@ -7,8 +7,10 @@ export default function NotFound() {
   return (
     <main className="grid min-h-[100dvh] place-items-center px-4">
       <div className="flex max-w-sm flex-col items-center gap-3 text-center">
-        <MagnifyingGlass size={32} className="text-text-muted" aria-hidden="true" />
-        <h1 className="text-2xl leading-8 font-semibold">Not found</h1>
+        <span className="grid size-14 place-items-center rounded-base border-2 border-border bg-main text-on-fill shadow-hard">
+          <MagnifyingGlass size={28} weight="bold" aria-hidden="true" />
+        </span>
+        <h1 className="text-2xl leading-8 font-bold">Not found</h1>
         <p className="text-text-muted">
           This page does not exist, or it belongs to an installation you cannot access.
         </p>

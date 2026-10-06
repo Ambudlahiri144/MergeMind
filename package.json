@@ -26,7 +26,7 @@
     "test:e2e": "npm run test:e2e -w @mergemind/web --if-present",
     "test:cov": "vitest run --coverage",
     "eval": "npm run eval -w @mergemind/evals --",
-    "lint": "eslint .",
+    "lint": "npm run typegen -w @mergemind/web && eslint .",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

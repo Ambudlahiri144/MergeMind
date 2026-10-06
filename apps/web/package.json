@@ -4,11 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "npm run build -w @mergemind/shared",
     "dev": "next dev --port 3000",
+    "prebuild": "npm run build -w @mergemind/shared",
     "build": "next build",
     "start": "next start --port 3000",
-    "typecheck": "next typegen && tsc -p tsconfig.json && tsc -p e2e/tsconfig.json",
+    "typegen": "next typegen",
+    "typecheck": "npm run typegen && tsc -p tsconfig.json && tsc -p e2e/tsconfig.json",
+    "pretest:e2e": "npm run build -w @mergemind/shared",
     "test:e2e": "playwright test",
+    "prescreenshots": "npm run build -w @mergemind/shared",
     "screenshots": "playwright test -c playwright.screens.config.ts"
   },
   "dependencies": {
@@ -18,7 +23,6 @@
     "better-auth": "^1.7.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "geist": "^1.7.2",
     "jose": "^6.2.12",
     "next": "^16.3.8",
     "react": "^19.3.0",

@@ -16,8 +16,13 @@ import { ThemeToggle } from './theme-toggle';
 
 function Wordmark() {
   return (
-    <Link href="/repos" className="flex h-10 items-center gap-2 rounded-md pr-2 font-semibold">
-      <GitPullRequest size={20} weight="bold" className="text-accent" aria-hidden="true" />
+    <Link
+      href="/repos"
+      className="flex h-10 items-center gap-2 rounded-base pr-2 text-lg font-bold"
+    >
+      <span className="grid size-8 place-items-center rounded-base border-2 border-border bg-main text-on-fill shadow-hard-sm">
+        <GitPullRequest size={18} weight="bold" aria-hidden="true" />
+      </span>
       MergeMind
     </Link>
   );
@@ -31,9 +36,9 @@ function UserMenu({ viewer }: { viewer: Viewer }) {
       </span>
       <button
         type="submit"
-        className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-text-muted transition-colors duration-150 hover:bg-surface-muted hover:text-text"
+        className="inline-flex h-10 items-center gap-2 rounded-base border-2 border-transparent px-3 font-bold text-text-muted hover:border-border hover:bg-surface-muted hover:text-text"
       >
-        <SignOut size={20} aria-hidden="true" />
+        <SignOut size={20} weight="bold" aria-hidden="true" />
         <span className="sr-only sm:not-sr-only">Sign out</span>
       </button>
     </form>
@@ -57,13 +62,13 @@ export function AppShell({
     <>
       <a
         href="#main"
-        className="sr-only rounded-md bg-surface px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+        className="sr-only rounded-base border-2 border-border bg-main px-3 py-2 font-bold text-on-fill focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
         style={{ zIndex: Z_INDEX.toast }}
       >
         Skip to content
       </a>
       <header
-        className="sticky top-0 border-b border-border bg-surface/95 backdrop-blur"
+        className="sticky top-0 border-b-2 border-border bg-surface"
         style={{ zIndex: Z_INDEX.header }}
       >
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 md:px-6">
@@ -75,12 +80,12 @@ export function AppShell({
             <details className="relative md:hidden">
               <summary
                 aria-label="Menu"
-                className="inline-flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-md hover:bg-surface-muted [&::-webkit-details-marker]:hidden"
+                className="inline-flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-base border-2 border-border bg-surface hover:bg-surface-muted [&::-webkit-details-marker]:hidden"
               >
-                <List size={20} aria-hidden="true" />
+                <List size={20} weight="bold" aria-hidden="true" />
               </summary>
               <div
-                className="absolute right-0 mt-2 w-56 rounded-lg border border-border bg-surface p-2 shadow-pop"
+                className="absolute right-0 mt-2 w-56 rounded-base border-2 border-border bg-surface p-2 shadow-hard"
                 style={{ zIndex: Z_INDEX.popover }}
               >
                 <NavLinks />
@@ -89,7 +94,7 @@ export function AppShell({
           </div>
         </div>
       </header>
-      <main id="main" className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+      <main id="main" className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         {children}
       </main>
     </>

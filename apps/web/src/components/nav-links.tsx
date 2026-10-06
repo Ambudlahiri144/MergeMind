@@ -23,10 +23,10 @@ export function NavLinks({ className }: { className?: string }) {
                 href={link.href}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'flex h-10 items-center rounded-md px-3 font-medium transition-colors duration-150',
+                  'flex h-10 items-center rounded-base border-2 px-3 font-bold',
                   isActive
-                    ? 'bg-accent-subtle text-text'
-                    : 'text-text-muted hover:bg-surface-muted hover:text-text',
+                    ? 'border-border bg-main text-on-fill shadow-hard-sm'
+                    : 'border-transparent text-text-muted hover:border-border hover:bg-surface-muted hover:text-text',
                 )}
               >
                 {link.label}
