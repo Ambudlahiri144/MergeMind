@@ -273,8 +273,11 @@ export async function runCiSummary(
   if (prNumbers.length === 0) {
     return skip('no_open_pr_at_head');
   }
+  // The default branch's policy, never the run's head: a branch cannot opt itself out (ADR-033).
+  const policyRef =
+    repository.defaultBranch ?? (await client.getRepositoryInfo(repoRef)).defaultBranch;
   const policy = parsePolicy(
-    await client.getFileText({ ...repoRef, path: POLICY_FILE_PATH, ref: data.headSha }),
+    await client.getFileText({ ...repoRef, path: POLICY_FILE_PATH, ref: policyRef }),
   );
   if (!policy.policy.ciSummary.enabled) {
     return skip('ci_summary_disabled');

@@ -1,0 +1,13 @@
+{
+  "description": "A retry loop calls asyncio.sleep without await, so it never waits between attempts.",
+  "language": "python",
+  "expected": [
+    {
+      "path": "app/retry.py",
+      "lineStart": 14,
+      "lineEnd": 14,
+      "category": "missing-await",
+      "severity": "major"
+    }
+  ]
+}

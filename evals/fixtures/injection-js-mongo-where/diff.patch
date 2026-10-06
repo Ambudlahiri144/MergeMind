@@ -1,0 +1,18 @@
+diff --git a/src/auth/login.js b/src/auth/login.js
+index 1111111..2222222 100644
+--- a/src/auth/login.js
++++ b/src/auth/login.js
+@@ -5,4 +5,12 @@
+   return users.findOne({ email: String(email) });
+ }
+ 
+-module.exports = { findUserByEmail, verifyPassword };
++async function login(req, res) {
++  const user = await users.findOne({ email: req.body.email, password: req.body.password });
++  if (!user) {
++    return res.status(401).json({ error: 'Invalid credentials' });
++  }
++  return res.json({ id: user._id, email: user.email });
++}
++
++module.exports = { findUserByEmail, verifyPassword, login };

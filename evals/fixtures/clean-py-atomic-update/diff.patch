@@ -1,0 +1,21 @@
+diff --git a/app/inventory.py b/app/inventory.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/app/inventory.py
+@@ -0,0 +1,15 @@
++from .db import get_connection
++
++
++class OutOfStock(Exception):
++    pass
++
++
++def reserve(product_id: int, quantity: int) -> None:
++    with get_connection() as conn:
++        cursor = conn.execute(
++            "UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?",
++            (quantity, product_id, quantity),
++        )
++        if cursor.rowcount == 0:
++            raise OutOfStock(product_id)

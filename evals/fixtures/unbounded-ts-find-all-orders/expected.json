@@ -1,0 +1,13 @@
+{
+  "description": "An export endpoint loads every order in the collection into memory with no limit.",
+  "language": "typescript",
+  "expected": [
+    {
+      "path": "src/reports/export.ts",
+      "lineStart": 10,
+      "lineEnd": 10,
+      "category": "unbounded-query",
+      "severity": "major"
+    }
+  ]
+}

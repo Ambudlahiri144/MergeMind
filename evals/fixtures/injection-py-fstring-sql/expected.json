@@ -1,0 +1,13 @@
+{
+  "description": "A Flask view looks up an order by id with an f-string SQL query.",
+  "language": "python",
+  "expected": [
+    {
+      "path": "app/orders.py",
+      "lineStart": 19,
+      "lineEnd": 19,
+      "category": "injection",
+      "severity": "critical"
+    }
+  ]
+}

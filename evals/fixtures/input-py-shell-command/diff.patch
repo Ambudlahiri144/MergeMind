@@ -1,0 +1,14 @@
+diff --git a/app/thumbs.py b/app/thumbs.py
+index 1111111..2222222 100644
+--- a/app/thumbs.py
++++ b/app/thumbs.py
+@@ -1,3 +1,9 @@
+ import subprocess
+ 
+ THUMB_SIZE = "320x320"
++
++
++def make_thumbnail(filename: str) -> str:
++    out = f"thumbs/{filename}.jpg"
++    subprocess.run(f"convert uploads/{filename} -resize {THUMB_SIZE} {out}", shell=True, check=True)
++    return out

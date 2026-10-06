@@ -1,0 +1,18 @@
+diff --git a/src/history.js b/src/history.js
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/history.js
+@@ -0,0 +1,12 @@
++function latestEntry(entries) {
++  if (entries.length === 0) {
++    return null;
++  }
++  return entries[entries.length];
++}
++
++function previousEntry(entries) {
++  return entries.length > 1 ? entries[entries.length - 2] : null;
++}
++
++module.exports = { latestEntry, previousEntry };

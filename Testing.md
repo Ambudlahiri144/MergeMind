@@ -23,7 +23,7 @@
 | **Contract** | Recorded GitHub webhook payloads parse with our Zod schemas; `.mergemind.yml` fixtures | Vitest | < 5 s | every PR |
 | **Integration** | HTTP routes, webhook pipeline, worker processors, Mongo queries and indexes, BullMQ behavior | Vitest + Supertest + Testcontainers + MSW | < 3 min | every PR |
 | **E2E** | Sign in (mocked) → repos → PR → run detail; dismiss finding; a11y | Playwright + `@axe-core/playwright` | < 5 min | every PR touching `apps/web`, nightly |
-| **LLM evals** | Precision/recall of real review passes on seeded bugs | `evals/` runner (`npm run eval`) | ~10-20 min (quota-bound) | on demand, nightly, required for prompt changes |
+| **LLM evals** | Precision/recall of real review passes on seeded bugs | `evals/` runner (`npm run eval`) | ~40 min (paced under Groq's 8K tokens/min) | on demand (GitHub Actions `Eval` workflow, manual), required for prompt changes |
 | **Load (smoke)** | Webhook ack latency under burst | autocannon | 1 min | before demo / release |
 
 ---
@@ -120,6 +120,11 @@ test/setup/                                    shared Testcontainers + MSW setup
 - A finding **matches** when path matches, the line range overlaps the expected range, and the category matches.
 - **Gates** (from PRD): precision ≥ 0.70, recall (critical+major) ≥ 0.50.
 - The output report goes to `evals/reports/<date>-<promptVersion>.json` and is summarized in the console.
+- **How it runs:** fixtures (`evals/fixtures/<id>/diff.patch` + `expected.json`) go through the worker's own stages (chunking, `runPasses` on the production provider chain, anchoring, cross-pass merge, confidence filter). One fixture at a time, paced by a rolling token window (`--tpm`, default 7,000); a fixture whose passes failed is retried after the breaker cooldown, so quota hiccups never count as misses. Flags: `--only a,b`, `--max-fixtures n`, `--tpm n`.
+- **Matching** is one-to-one per fixture: a bug restated twice counts once and the restatement is a false positive. `injection` and `unchecked-input` on the same lines are one family (ADR-021, ADR-032).
+- **Recall** counts a seeded critical/major bug as found when any report matches it, even one reported as minor (the comment is posted); precision only credits critical/major reports.
+- **Compare like with like:** when Groq's daily token limit runs out, the chain falls back to Gemini mid-run. Check each fixture's `providersUsed` in the report before comparing two runs.
+- **Fixture validation** is a unit test: every seeded bug starts and ends on a line its diff adds, each category appears at least 3 times, and no fixture contains a secret that GitHub push protection would flag.
 
 ---
 
@@ -136,6 +141,12 @@ test/setup/                                    shared Testcontainers + MSW setup
 - **Snapshot tests only** for stable rendered markdown (review summary comment). Never snapshot LLM output.
 
 ---
+
+### Chaos check (live, PRD §7)
+`npm run chaos:check -- <owner/repo> <pr> [--at llm|publishing|posted]` with the dev worker stopped and a review job queued for that PR: it starts a worker, kills it at the chosen log line (`review.contextRetrieved`, `review.publishing` or `review.posted`), starts a fresh one, and checks on GitHub that the run's marker appears on at most one review and no inline-comment fingerprint repeats. The deterministic version is the integration test for a crash right after `createReview`.
+
+### Screenshots
+`npm run screenshots -w @mergemind/web` runs `apps/web/e2e/screens/` on the E2E stack (separate Playwright config, never part of `test:e2e`) and writes the landing page's images to `apps/web/public/screens/`.
 
 ## 6. Coverage targets
 

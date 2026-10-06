@@ -1,0 +1,13 @@
+{
+  "description": "A helper reads the last item with arr[arr.length], which is always undefined.",
+  "language": "javascript",
+  "expected": [
+    {
+      "path": "src/history.js",
+      "lineStart": 5,
+      "lineEnd": 5,
+      "category": "off-by-one",
+      "severity": "major"
+    }
+  ]
+}

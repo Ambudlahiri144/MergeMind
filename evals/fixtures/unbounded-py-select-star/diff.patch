@@ -1,0 +1,19 @@
+diff --git a/app/jobs/notify.py b/app/jobs/notify.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/app/jobs/notify.py
+@@ -0,0 +1,13 @@
++from ..db import get_connection
++from ..mail import send_digest
++
++
++def send_weekly_digests() -> int:
++    with get_connection() as conn:
++        users = conn.execute("SELECT id, email, wants_digest FROM users").fetchall()
++    sent = 0
++    for user in users:
++        if user["wants_digest"]:
++            send_digest(user["email"])
++            sent += 1
++    return sent

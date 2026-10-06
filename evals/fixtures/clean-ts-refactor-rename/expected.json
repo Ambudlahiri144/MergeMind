@@ -1,0 +1,5 @@
+{
+  "description": "A pure refactor: a helper is renamed and its callers updated, with no behaviour change.",
+  "language": "typescript",
+  "expected": []
+}

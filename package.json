@@ -25,13 +25,14 @@
     "test:int": "vitest run --project int",
     "test:e2e": "npm run test:e2e -w @mergemind/web --if-present",
     "test:cov": "vitest run --coverage",
-    "eval": "npm run eval -w @mergemind/evals",
+    "eval": "npm run eval -w @mergemind/evals --",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "webhook:send": "tsx --conditions=@mergemind/source --env-file-if-exists=.env scripts/send-webhook.ts",
-    "llm:smoke": "tsx --conditions=@mergemind/source --env-file-if-exists=.env scripts/llm-smoke.ts"
+    "llm:smoke": "tsx --conditions=@mergemind/source --env-file-if-exists=.env scripts/llm-smoke.ts",
+    "chaos:check": "tsx --conditions=@mergemind/source --env-file-if-exists=.env scripts/chaos-check.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

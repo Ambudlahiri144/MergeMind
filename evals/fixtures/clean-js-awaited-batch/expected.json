@@ -1,0 +1,5 @@
+{
+  "description": "A batch job that awaits every write with bounded concurrency and reports failures.",
+  "language": "javascript",
+  "expected": []
+}

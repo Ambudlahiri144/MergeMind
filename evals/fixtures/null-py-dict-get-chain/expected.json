@@ -1,0 +1,13 @@
+{
+  "description": "A webhook parser chains attribute access on an optional nested field.",
+  "language": "python",
+  "expected": [
+    {
+      "path": "app/webhooks.py",
+      "lineStart": 15,
+      "lineEnd": 15,
+      "category": "null-deref",
+      "severity": "major"
+    }
+  ]
+}

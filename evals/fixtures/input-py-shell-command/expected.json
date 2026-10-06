@@ -1,0 +1,13 @@
+{
+  "description": "A thumbnail helper runs a shell command built from the uploaded file name.",
+  "language": "python",
+  "expected": [
+    {
+      "path": "app/thumbs.py",
+      "lineStart": 8,
+      "lineEnd": 8,
+      "category": "unchecked-input",
+      "severity": "critical"
+    }
+  ]
+}

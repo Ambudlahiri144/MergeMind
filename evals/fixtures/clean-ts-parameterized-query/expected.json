@@ -1,0 +1,5 @@
+{
+  "description": "A search endpoint with a parameterized query, a capped limit and input validation.",
+  "language": "typescript",
+  "expected": []
+}

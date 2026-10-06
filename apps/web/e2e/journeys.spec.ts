@@ -22,8 +22,9 @@ async function openSeededRun(page: Page, options: { checkA11y?: boolean } = {}) 
   await page.getByRole('link', { name: E2E_REPO }).click();
   await expect(page.getByRole('heading', { name: E2E_REPO, level: 1 })).toBeVisible();
   if (options.checkA11y) {
-    // No GitHub App in E2E: the policy panel shows the api's problem inline.
-    await expect(page.getByText('The GitHub App is not configured on the API')).toBeVisible();
+    // The policy comes from the fake GitHub: the repo's own .mergemind.yml on main.
+    await expect(page.getByText('.mergemind.yml on main')).toBeVisible();
+    await expect(page.getByText('Valid', { exact: true })).toBeVisible();
     await expectAccessible(page);
   }
 
@@ -59,6 +60,10 @@ test('repositories, then PR, then run detail with findings', async ({ signedIn: 
 
   await expect(page.getByRole('heading', { name: E2E_CRITICAL_TITLE })).toBeVisible();
   await expect(page.getByRole('heading', { name: E2E_MINOR_TITLE })).toBeVisible();
+  // The diff panel shows the flagged line from the file at the run's head.
+  await expect(page.getByRole('complementary', { name: 'Code' })).toContainText(
+    "const PAYMENT_KEY = 'pay_secret_prod_",
+  );
   await expectAccessible(page);
 });
 
@@ -131,4 +136,20 @@ test.describe('on a phone', () => {
     await openSeededRun(page);
     expect(await overflow(), 'run page').toBeLessThanOrEqual(0);
   });
+});
+
+test('the landing page is accessible and fits a phone', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Code review that never sleeps.' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Install on GitHub' })).toHaveCount(3);
+  await expectAccessible(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expectAccessible(page);
 });

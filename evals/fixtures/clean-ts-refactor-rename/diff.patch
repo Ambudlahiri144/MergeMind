@@ -1,0 +1,23 @@
+diff --git a/src/lib/money.ts b/src/lib/money.ts
+index 1111111..2222222 100644
+--- a/src/lib/money.ts
++++ b/src/lib/money.ts
+@@ -1,4 +1,5 @@
+-export function fmt(paise: number): string {
++/** Formats an amount in paise as rupees with two decimals. */
++export function formatRupees(paise: number): string {
+   return `Rs ${(paise / 100).toFixed(2)}`;
+ }
+ 
+diff --git a/src/cart/summary.ts b/src/cart/summary.ts
+index 1111111..2222222 100644
+--- a/src/cart/summary.ts
++++ b/src/cart/summary.ts
+@@ -1,5 +1,5 @@
+-import { fmt, sum } from '../lib/money';
++import { formatRupees, sum } from '../lib/money';
+ 
+ export function cartTotal(prices: readonly number[]): string {
+-  return fmt(sum(prices));
++  return formatRupees(sum(prices));
+ }

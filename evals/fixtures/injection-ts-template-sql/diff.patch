@@ -1,0 +1,16 @@
+diff --git a/src/routes/products.ts b/src/routes/products.ts
+index 1111111..2222222 100644
+--- a/src/routes/products.ts
++++ b/src/routes/products.ts
+@@ -5,3 +5,11 @@
+   const { rows } = await pool.query('SELECT id, name, price FROM products LIMIT 50');
+   res.json(rows);
+ }
++
++export async function searchProducts(req: Request, res: Response) {
++  const term = String(req.query.q ?? '');
++  const { rows } = await pool.query(
++    `SELECT id, name, price FROM products WHERE name ILIKE '%${term}%' LIMIT 50`,
++  );
++  res.json(rows);
++}

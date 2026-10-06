@@ -1,0 +1,13 @@
+{
+  "description": "A list endpoint passes the client-supplied limit straight to the query with no cap.",
+  "language": "javascript",
+  "expected": [
+    {
+      "path": "src/routes/comments.js",
+      "lineStart": 5,
+      "lineEnd": 7,
+      "category": "unbounded-query",
+      "severity": "major"
+    }
+  ]
+}

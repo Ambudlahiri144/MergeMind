@@ -1,0 +1,13 @@
+{
+  "description": "A wallet debit reads the balance, checks it, then writes it back without an atomic update.",
+  "language": "typescript",
+  "expected": [
+    {
+      "path": "src/wallet/debit.ts",
+      "lineStart": 5,
+      "lineEnd": 9,
+      "category": "race-condition",
+      "severity": "major"
+    }
+  ]
+}

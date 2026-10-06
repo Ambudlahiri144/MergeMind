@@ -1,0 +1,13 @@
+{
+  "description": "A signup handler checks for an existing username and then inserts, with no unique constraint.",
+  "language": "python",
+  "expected": [
+    {
+      "path": "app/signup.py",
+      "lineStart": 6,
+      "lineEnd": 9,
+      "category": "race-condition",
+      "severity": "major"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A pagination helper computes the last page index with an inclusive bound, returning an empty page.",
+  "language": "typescript",
+  "expected": [
+    {
+      "path": "src/lib/paginate.ts",
+      "lineStart": 5,
+      "lineEnd": 5,
+      "category": "off-by-one",
+      "severity": "major"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A payments client is configured with a live payment-gateway secret committed in source.",
+  "language": "typescript",
+  "expected": [
+    {
+      "path": "src/payments/client.ts",
+      "lineStart": 3,
+      "lineEnd": 3,
+      "category": "hardcoded-secret",
+      "severity": "critical"
+    }
+  ]
+}

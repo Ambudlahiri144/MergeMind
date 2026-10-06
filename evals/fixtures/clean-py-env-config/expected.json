@@ -1,0 +1,5 @@
+{
+  "description": "A settings module that reads secrets from the environment and fails fast when they are missing.",
+  "language": "python",
+  "expected": []
+}

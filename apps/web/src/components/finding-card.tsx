@@ -47,7 +47,10 @@ export function FindingCard({
       <h3 className="mt-2 text-[15px] leading-[22px] font-semibold">{finding.title}</h3>
       <p className="mt-1 whitespace-pre-line text-text-muted">{finding.body}</p>
       {finding.suggestion ? (
-        <pre className="mt-3 overflow-x-auto rounded-md bg-surface-muted p-3 font-mono text-[13px] leading-5">
+        <pre
+          tabIndex={0}
+          className="mt-3 overflow-x-auto rounded-md bg-surface-muted p-3 font-mono text-[13px] leading-5"
+        >
           <code>{finding.suggestion}</code>
         </pre>
       ) : null}

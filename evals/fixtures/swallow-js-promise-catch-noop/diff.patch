@@ -1,0 +1,15 @@
+diff --git a/src/mail/send.js b/src/mail/send.js
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/mail/send.js
+@@ -0,0 +1,9 @@
++const { transport } = require('./transport');
++
++function sendReceipt(to, orderId) {
++  return transport
++    .sendMail({ to, subject: `Receipt for order ${orderId}`, text: 'Thank you!' })
++    .catch(() => {});
++}
++
++module.exports = { sendReceipt };

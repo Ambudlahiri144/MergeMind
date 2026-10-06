@@ -1,0 +1,15 @@
+diff --git a/src/lib/retry.ts b/src/lib/retry.ts
+index 1111111..2222222 100644
+--- a/src/lib/retry.ts
++++ b/src/lib/retry.ts
+@@ -1,5 +1,8 @@
+-export async function retry(fn, attempts = 3) {
+-  let lastError;
++/**
++ * Calls `fn` up to `attempts` times and rethrows the last error when every attempt fails.
++ */
++export async function retry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
++  let lastError: unknown;
+   for (let i = 0; i < attempts; i += 1) {
+     try {
+       return await fn();

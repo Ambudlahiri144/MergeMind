@@ -106,7 +106,7 @@ export default async function RunPage(props: PageProps<'/runs/[runId]'>) {
       {data.findings.length === 0 ? (
         <EmptyState icon={CheckCircle} message="This run reported no findings." />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
           <div className="flex flex-col gap-6">
             {SEVERITIES.map((severity) => {
               const group = data.findings.filter((finding) => finding.severity === severity);

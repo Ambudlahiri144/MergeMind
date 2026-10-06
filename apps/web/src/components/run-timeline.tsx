@@ -32,7 +32,7 @@ export function RunTimeline({ runs }: { runs: readonly RunSummary[] }) {
         <li key={run.id}>
           <Link
             href={`/runs/${run.id}`}
-            className="grid gap-1 px-4 py-3 transition-colors duration-150 hover:bg-surface-muted md:grid-cols-[7rem_minmax(0,1fr)_8rem_6rem] md:items-center md:gap-4"
+            className="grid grid-cols-[minmax(0,1fr)] gap-1 px-4 py-3 transition-colors duration-150 hover:bg-surface-muted md:grid-cols-[7rem_minmax(0,1fr)_8rem_6rem] md:items-center md:gap-4"
           >
             <span className="font-mono text-[13px]">
               {shortSha(run.headSha)}

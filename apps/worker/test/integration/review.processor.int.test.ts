@@ -179,7 +179,13 @@ type Scenario = {
 
 /** A fresh installation, repo and PR so tests never share state. */
 async function createScenario(
-  options: { isDraft?: boolean; policy?: string } = {},
+  options: {
+    isDraft?: boolean;
+    /** `.mergemind.yml` on the base branch: the policy reviews apply (ADR-033). */
+    policy?: string;
+    /** A `.mergemind.yml` the PR itself changes: never applied before merge. */
+    headPolicy?: string;
+  } = {},
 ): Promise<Scenario> {
   nextId += 1;
   const installationId = nextId;
@@ -203,7 +209,17 @@ async function createScenario(
     },
   ]);
   if (options.policy !== undefined) {
-    fakeGithub.fileContents.set(`${repoFullName}@${HEAD_SHA}:.mergemind.yml`, options.policy);
+    fakeGithub.fileContents.set(`${repoFullName}@main:.mergemind.yml`, options.policy);
+  }
+  if (options.headPolicy !== undefined) {
+    fakeGithub.fileContents.set(`${repoFullName}@${HEAD_SHA}:.mergemind.yml`, options.headPolicy);
+    fakeGithub.pullRequestFiles.get(`${repoFullName}#7`)?.push({
+      filename: '.mergemind.yml',
+      status: 'added',
+      additions: 2,
+      deletions: 0,
+      patch: ['@@ -0,0 +1,2 @@', '+gate:', '+  failOn: never'].join('\n'),
+    });
   }
   return {
     installationId,
@@ -303,7 +319,7 @@ describe('review pipeline end to end', () => {
       status: 'completed',
       counts: { critical: 1, major: 1, minor: 1, filtered: 1, suppressed: 0, duplicate: 0 },
       tokens: { input: 3000, output: 300 },
-      promptVersion: 'security@2+correctness@2+maintainability@2',
+      promptVersion: 'security@3+correctness@3+maintainability@3',
     });
     const stored = await repos.findings.listForRun(runId);
     expect(stored).toHaveLength(4);
@@ -481,6 +497,20 @@ describe('review pipeline end to end', () => {
 
     expect(llm.calls.map((call) => call.pass)).toEqual(['security']);
     expect(outcome.gateConclusion).toBe('success');
+  });
+
+  it('reads .mergemind.yml from the base branch, so a PR cannot switch off its own gate', async () => {
+    const scenario = await createScenario({
+      headPolicy: ['gate:', '  failOn: never', ''].join('\n'),
+    });
+    const llm = createFakeLlm({ security: [SQL_INJECTION] });
+
+    const outcome = await runReview(scenario.data, meta(), buildDeps(llm));
+
+    expect(outcome.gateConclusion).toBe('failure');
+    expect(reviewsFor(scenario)[0]?.body).toContain(
+      'This PR changes `.mergemind.yml`; the change applies after it is merged',
+    );
   });
 
   it('posts only a notice for a PR above maxChangedLines', async () => {

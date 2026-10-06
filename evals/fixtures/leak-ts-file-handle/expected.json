@@ -1,0 +1,13 @@
+{
+  "description": "A CSV reader opens a file handle and never closes it when parsing throws or succeeds.",
+  "language": "typescript",
+  "expected": [
+    {
+      "path": "src/import/read-csv.ts",
+      "lineStart": 4,
+      "lineEnd": 4,
+      "category": "resource-leak",
+      "severity": "major"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A payment webhook handler wraps processing in a bare except that passes silently.",
+  "language": "python",
+  "expected": [
+    {
+      "path": "app/payments/webhook.py",
+      "lineStart": 7,
+      "lineEnd": 8,
+      "category": "swallowed-error",
+      "severity": "major"
+    }
+  ]
+}

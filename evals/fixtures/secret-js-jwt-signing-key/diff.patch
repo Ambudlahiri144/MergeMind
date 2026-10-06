@@ -1,0 +1,20 @@
+diff --git a/src/session.js b/src/session.js
+index 1111111..2222222 100644
+--- a/src/session.js
++++ b/src/session.js
+@@ -1,5 +1,14 @@
+ const jwt = require('jsonwebtoken');
+ 
+ const ONE_HOUR = 60 * 60;
++const SIGNING_SECRET = 'mergemind-prod-signing-secret-7f3a9c2e41b8';
+ 
+-module.exports = { ONE_HOUR };
++function issueSession(userId) {
++  return jwt.sign({ sub: userId }, SIGNING_SECRET, { expiresIn: ONE_HOUR });
++}
++
++function readSession(token) {
++  return jwt.verify(token, SIGNING_SECRET);
++}
++
++module.exports = { ONE_HOUR, issueSession, readSession };

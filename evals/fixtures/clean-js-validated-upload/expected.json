@@ -1,0 +1,5 @@
+{
+  "description": "An upload route that validates type and size and stores under a generated name.",
+  "language": "javascript",
+  "expected": []
+}

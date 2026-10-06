@@ -1,0 +1,45 @@
+# The seeded-bug benchmark against the production provider chain (PRD §7, ADR-032).
+# Manual only: a full run is about 120 LLM calls, so it never spends the free quota on a
+# schedule. Needs the GROQ_API_KEY repository secret.
+name: Eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: Comma-separated fixture ids (empty runs all 40)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    name: Seeded-bug benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Run the benchmark
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ONLY: ${{ inputs.only }}
+        run: |
+          if [ -n "$ONLY" ]; then
+            npm run eval -- --only "$ONLY"
+          else
+            npm run eval
+          fi
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: evals/reports/
+          retention-days: 30

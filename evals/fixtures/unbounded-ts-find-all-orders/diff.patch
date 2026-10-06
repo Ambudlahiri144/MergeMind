@@ -1,0 +1,14 @@
+diff --git a/src/reports/export.ts b/src/reports/export.ts
+index 1111111..2222222 100644
+--- a/src/reports/export.ts
++++ b/src/reports/export.ts
+@@ -5,3 +5,9 @@
+ export async function recentOrders(_req: Request, res: Response) {
+   res.json(await orders.find().sort({ createdAt: -1 }).limit(100).toArray());
+ }
++
++export async function exportAllOrders(_req: Request, res: Response) {
++  const all = await orders.find({}).toArray();
++  res.setHeader('content-type', 'application/json');
++  res.send(JSON.stringify(all));
++}

@@ -61,7 +61,7 @@ function InstallationSettings({
           {installation.status} · your role: {installation.role}
         </span>
       </h2>
-      <dl className="mt-4 grid gap-4 md:grid-cols-[12rem_minmax(0,1fr)]">
+      <dl className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-[12rem_minmax(0,1fr)]">
         <dt className="font-medium">Usage</dt>
         <dd>
           {usage.ok ? <UsageLine usage={usage.data} /> : <ErrorPanel problem={usage.problem} />}

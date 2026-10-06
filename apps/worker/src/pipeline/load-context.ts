@@ -100,7 +100,10 @@ export async function loadBaseContext(
   };
 }
 
-/** Stage 1b: `.mergemind.yml` at the PR head (PRD F7). Missing or invalid → defaults + errors. */
+/**
+ * Stage 1b: `.mergemind.yml` on the PR's **base branch** (PRD F7, ADR-033), so a PR cannot
+ * relax its own review (e.g. `gate.failOn: never`). Missing or invalid → defaults + errors.
+ */
 export async function loadPolicy(
   client: GithubInstallationClient,
   context: BaseContext,
@@ -108,7 +111,7 @@ export async function loadPolicy(
   const text = await client.getFileText({
     ...context.repoRef,
     path: POLICY_FILE_PATH,
-    ref: context.data.headSha,
+    ref: context.data.baseRef,
   });
   return parsePolicy(text);
 }

@@ -1,0 +1,5 @@
+{
+  "description": "Adds unit tests for an existing slugify helper; no production code changes.",
+  "language": "javascript",
+  "expected": []
+}

@@ -1,0 +1,18 @@
+diff --git a/src/routes/comments.js b/src/routes/comments.js
+index 1111111..2222222 100644
+--- a/src/routes/comments.js
++++ b/src/routes/comments.js
+@@ -1,3 +1,12 @@
+ const { comments } = require('../db');
+ 
+-module.exports = {};
++async function listComments(req, res) {
++  const limit = Number(req.query.limit) || 20;
++  const rows = await comments
++    .find({ postId: req.params.postId })
++    .limit(limit)
++    .toArray();
++  res.json(rows);
++}
++
++module.exports = { listComments };

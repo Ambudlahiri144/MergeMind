@@ -1,0 +1,13 @@
+{
+  "description": "An audit logger fires a database insert without awaiting it, then reports success.",
+  "language": "typescript",
+  "expected": [
+    {
+      "path": "src/audit/record.ts",
+      "lineStart": 10,
+      "lineEnd": 10,
+      "category": "missing-await",
+      "severity": "major"
+    }
+  ]
+}

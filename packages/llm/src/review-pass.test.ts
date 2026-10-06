@@ -100,7 +100,7 @@ describe('createReviewLlm.reviewPass', () => {
     const result = await llm.reviewPass(input);
 
     expect(result.provider).toBe('groq');
-    expect(result.promptVersion).toBe('security@2');
+    expect(result.promptVersion).toBe('security@3');
     expect(result.findings).toEqual([
       expect.objectContaining({
         pass: 'security',
@@ -327,7 +327,7 @@ describe('CircuitBreaker', () => {
 describe('prompts', () => {
   it('joins pass versions for reviewRuns.promptVersion', () => {
     expect(promptVersionFor(['security', 'correctness', 'maintainability'])).toBe(
-      'security@2+correctness@2+maintainability@2',
+      'security@3+correctness@3+maintainability@3',
     );
   });
 

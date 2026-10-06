@@ -20,8 +20,12 @@ if (process.env.NODE_ENV === 'production' && process.env.MERGEMIND_E2E === '1') 
 }
 
 const nextConfig: NextConfig = {
+  // E2E runs its own `next dev` next to yours; Next allows one dev server per build directory.
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   reactStrictMode: true,
   poweredByHeader: false,
+  // No dev badge in E2E runs (it would show up in the landing-page screenshots).
+  ...(process.env.MERGEMIND_E2E === '1' ? { devIndicators: false as const } : {}),
   turbopack: {
     root: repoRoot,
     // Turbopack has no custom export conditions, so the `@mergemind/source` condition

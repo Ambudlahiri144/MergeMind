@@ -1,0 +1,13 @@
+{
+  "description": "An S3-compatible upload helper creates a boto3 client with its access key pair in the code.",
+  "language": "python",
+  "expected": [
+    {
+      "path": "app/storage.py",
+      "lineStart": 12,
+      "lineEnd": 13,
+      "category": "hardcoded-secret",
+      "severity": "critical"
+    }
+  ]
+}

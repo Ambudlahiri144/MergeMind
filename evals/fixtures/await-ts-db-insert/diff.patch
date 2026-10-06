@@ -1,0 +1,13 @@
+diff --git a/src/audit/record.ts b/src/audit/record.ts
+index 1111111..2222222 100644
+--- a/src/audit/record.ts
++++ b/src/audit/record.ts
+@@ -5,3 +5,8 @@
+ export function describe(event: AuditEvent): string {
+   return `${event.actor} ${event.action} at ${event.at.toISOString()}`;
+ }
++
++export async function recordEvent(event: AuditEvent): Promise<{ ok: true }> {
++  db.auditEvents.insertOne(event);
++  return { ok: true };
++}

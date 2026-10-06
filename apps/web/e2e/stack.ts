@@ -1,5 +1,5 @@
 // The whole stack for Playwright (Testing.md §1 E2E): Mongo + Redis containers, seeded data,
-// the real api in-process (no GitHub App, so policy and snippets show their error state), and
+// the real api in-process with the MSW fake GitHub (policy and code snippets come from it), and
 // `next dev` with the E2E sign-in seam (ADR-029). Playwright starts this as its webServer.
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -18,9 +18,12 @@ import {
   disconnectMongo,
   ensureDbIndexes,
 } from '@mergemind/db';
+import { createGithubApp } from '@mergemind/github';
+import { createFakeGithub, createTestPrivateKey } from '@mergemind/github/testing';
 import { usagePeriod } from '@mergemind/shared';
 import { createLogger } from '@mergemind/shared/logger';
 import { Redis } from 'ioredis';
+import { setupServer } from 'msw/node';
 import { GenericContainer, Wait } from 'testcontainers';
 
 import { createApp } from '../../api/src/app.js';
@@ -43,6 +46,44 @@ import {
 const webDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const logger = createLogger({ name: 'e2e-api', level: 'fatal' });
 const HEAD = 'c3d4e5f60718293a4b5c6d7e8f9012345678901a';
+
+/** The file the seeded findings point at, served by the fake GitHub for the snippet panel. */
+const REFUNDS_TS = [
+  "import { gateway } from './gateway';",
+  '',
+  '// Refund calls go straight to the payment gateway.',
+  "const PAYMENT_KEY = 'pay_secret_prod_4b7e1c9a2d6f3e8b0a5c7d1e9f2b4a6c';",
+  '',
+  'export async function refund(orderId: string, amountInPaise: number) {',
+  '  return gateway.refunds.create({ orderId, amount: amountInPaise, key: PAYMENT_KEY });',
+  '}',
+  '',
+  'export async function getRefundTotals(orderIds: readonly string[]) {',
+  '  const rows = await gateway.refunds.list({ orderIds });',
+  '  return rows.reduce((total, row) => total + row.amount, 0);',
+  '}',
+  '',
+].join('\n');
+
+const POLICY_YML = [
+  'version: 1',
+  'review:',
+  '  passes: [security, correctness, maintainability]',
+  '  minConfidence: 0.7',
+  'gate:',
+  '  failOn: critical',
+  '',
+].join('\n');
+
+/** Answers the api's GitHub calls in-process (token mint, contents) like the integration tests. */
+function startFakeGithub() {
+  const fake = createFakeGithub();
+  fake.fileContents.set(`${E2E_REPO}@main:.mergemind.yml`, POLICY_YML);
+  fake.fileContents.set(`${E2E_REPO}@${HEAD}:src/refunds.ts`, REFUNDS_TS);
+  const server = setupServer(...fake.handlers);
+  server.listen({ onUnhandledRequest: 'bypass' });
+  return server;
+}
 
 async function seed() {
   const installations = createInstallationsRepository();
@@ -110,8 +151,8 @@ async function seed() {
       lineStart: 4,
       lineEnd: 4,
       title: E2E_CRITICAL_TITLE,
-      body: 'A live API key is committed. Anyone with read access can use it.',
-      suggestion: 'const key = process.env.PAYMENT_API_KEY;',
+      body: 'A live payment key is committed. Anyone with read access to the repository can use it.',
+      suggestion: 'const PAYMENT_KEY = process.env.PAYMENT_API_KEY;',
       fingerprint: 'a'.repeat(64),
       placement: 'inline',
     },
@@ -190,6 +231,14 @@ async function main() {
     `redis://${redisContainer.getHost()}:${String(redisContainer.getMappedPort(6379))}`,
     { maxRetriesPerRequest: null },
   );
+  const fakeGithub = startFakeGithub();
+  const github = createGithubApp({
+    appId: 4_100_001,
+    privateKey: createTestPrivateKey(),
+    logger,
+    retries: 0,
+    isThrottled: false,
+  });
   const installations = createInstallationsRepository();
   const app = createApp({
     logger,
@@ -204,7 +253,7 @@ async function main() {
       access: createAccessService({
         installations,
         users: createUsersRepository(),
-        github: null,
+        github,
         logger,
         now: () => new Date(),
       }),
@@ -217,7 +266,7 @@ async function main() {
         suppressions: createSuppressionsRepository(),
         usageLedger: createUsageLedgerRepository(),
       },
-      github: null,
+      github,
       reviewProducer: createReviewProducer({ connection: redis, prefix: 'e2e' }),
       indexProducer: createIndexProducer({ connection: redis, prefix: 'e2e' }),
       now: () => new Date(),
@@ -238,6 +287,7 @@ async function main() {
       BETTER_AUTH_SECRET: E2E_AUTH_SECRET,
       BETTER_AUTH_URL: `http://localhost:${String(E2E_WEB_PORT)}`,
       NEXT_TELEMETRY_DISABLED: '1',
+      NEXT_DIST_DIR: '.next-e2e',
     },
   });
 
@@ -249,6 +299,7 @@ async function main() {
     isStopping = true;
     web.kill();
     apiServer.close();
+    fakeGithub.close();
     await redis.quit().catch(() => undefined);
     await disconnectMongo();
     await Promise.all([mongo.stop(), redisContainer.stop()]);

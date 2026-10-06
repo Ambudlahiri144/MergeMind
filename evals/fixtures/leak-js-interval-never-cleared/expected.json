@@ -1,0 +1,13 @@
+{
+  "description": "A polling helper starts a setInterval for every subscriber and never clears it.",
+  "language": "javascript",
+  "expected": [
+    {
+      "path": "src/poll.js",
+      "lineStart": 5,
+      "lineEnd": 5,
+      "category": "resource-leak",
+      "severity": "major"
+    }
+  ]
+}

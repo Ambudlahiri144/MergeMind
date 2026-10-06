@@ -1,0 +1,13 @@
+{
+  "description": "An email sender attaches .catch(() => {}) so delivery failures disappear.",
+  "language": "javascript",
+  "expected": [
+    {
+      "path": "src/mail/send.js",
+      "lineStart": 6,
+      "lineEnd": 6,
+      "category": "swallowed-error",
+      "severity": "major"
+    }
+  ]
+}

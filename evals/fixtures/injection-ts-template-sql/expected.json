@@ -1,0 +1,13 @@
+{
+  "description": "A search endpoint builds its SQL with a template string from the query parameter.",
+  "language": "typescript",
+  "expected": [
+    {
+      "path": "src/routes/products.ts",
+      "lineStart": 11,
+      "lineEnd": 12,
+      "category": "injection",
+      "severity": "critical"
+    }
+  ]
+}

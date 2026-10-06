@@ -1,0 +1,13 @@
+{
+  "description": "A handler uses the result of Array.find without checking for undefined.",
+  "language": "typescript",
+  "expected": [
+    {
+      "path": "src/cart/apply-coupon.ts",
+      "lineStart": 10,
+      "lineEnd": 10,
+      "category": "null-deref",
+      "severity": "major"
+    }
+  ]
+}

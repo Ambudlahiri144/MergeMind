@@ -1,0 +1,13 @@
+{
+  "description": "A download route joins a user-supplied file name onto the uploads directory.",
+  "language": "typescript",
+  "expected": [
+    {
+      "path": "src/routes/download.ts",
+      "lineStart": 8,
+      "lineEnd": 8,
+      "category": "unchecked-input",
+      "severity": "critical"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "description": "A lookup that handles the missing case explicitly and returns a typed result.",
+  "language": "typescript",
+  "expected": []
+}

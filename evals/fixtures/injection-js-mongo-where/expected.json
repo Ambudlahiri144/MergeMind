@@ -1,0 +1,13 @@
+{
+  "description": "A login helper passes the request body straight into a MongoDB filter.",
+  "language": "javascript",
+  "expected": [
+    {
+      "path": "src/auth/login.js",
+      "lineStart": 9,
+      "lineEnd": 9,
+      "category": "injection",
+      "severity": "critical"
+    }
+  ]
+}

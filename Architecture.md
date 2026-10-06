@@ -38,7 +38,7 @@ GitHub ──POST /webhooks/github──► api
   4. respond 202 (target p95 < 300 ms)
 
 worker (queue: review, job: review.pr)
-  1. loadContext      installation token, PR metadata, .mergemind.yml @ headSha
+  1. loadContext      installation token, PR metadata, .mergemind.yml @ the PR's base branch (ADR-033)
   2. budgetCheck      usageLedger month-to-date vs installation budget
   3. createCheckRun   mergemind/review → in_progress
   4. fetchDiff        files + patches; drop ignorePaths; compute changed lines
@@ -65,7 +65,7 @@ workflow_run.completed → api decides (ADR-028):
   success with a linked PR                             → ci-summary.run (outcome passed)
   anything else (cancelled, skipped, no PR)            → ignored
 worker (failed):
-  open PRs still at the run's head SHA (fork PRs looked up by SHA) → .mergemind.yml ciSummary.enabled
+  open PRs still at the run's head SHA (fork PRs looked up by SHA) → .mergemind.yml ciSummary.enabled (default branch)
   → comment already describes this run attempt or a newer one? stop
   → jobs of the attempt → failed jobs (max 3) → job logs (404/410 = expired)
   → strip timestamps + ANSI → failing step's section → window around ##[error] / error lines

@@ -1,0 +1,13 @@
+{
+  "description": "A report function opens a database connection per call and never closes it.",
+  "language": "python",
+  "expected": [
+    {
+      "path": "app/reports.py",
+      "lineStart": 7,
+      "lineEnd": 7,
+      "category": "resource-leak",
+      "severity": "major"
+    }
+  ]
+}

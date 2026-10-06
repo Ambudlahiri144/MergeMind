@@ -1,0 +1,13 @@
+{
+  "description": "A profile update copies the whole request body onto the user, including the role field.",
+  "language": "javascript",
+  "expected": [
+    {
+      "path": "src/routes/profile.js",
+      "lineStart": 8,
+      "lineEnd": 8,
+      "category": "unchecked-input",
+      "severity": "critical"
+    }
+  ]
+}

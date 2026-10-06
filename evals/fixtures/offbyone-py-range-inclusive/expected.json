@@ -1,0 +1,13 @@
+{
+  "description": "A loop over a list uses range(len + 1) and indexes past the end.",
+  "language": "python",
+  "expected": [
+    {
+      "path": "app/stats.py",
+      "lineStart": 3,
+      "lineEnd": 3,
+      "category": "off-by-one",
+      "severity": "major"
+    }
+  ]
+}

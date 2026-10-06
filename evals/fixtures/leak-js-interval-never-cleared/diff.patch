@@ -1,0 +1,20 @@
+diff --git a/src/poll.js b/src/poll.js
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/poll.js
+@@ -0,0 +1,14 @@
++const { getStatus } = require('./status');
++
++function watchStatus(jobId, onChange) {
++  let last = null;
++  setInterval(async () => {
++    const status = await getStatus(jobId);
++    if (status !== last) {
++      last = status;
++      onChange(status);
++    }
++  }, 1000);
++}
++
++module.exports = { watchStatus };

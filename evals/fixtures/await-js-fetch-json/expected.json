@@ -1,0 +1,13 @@
+{
+  "description": "A rates helper returns the parsed body without awaiting response.json().",
+  "language": "javascript",
+  "expected": [
+    {
+      "path": "src/rates.js",
+      "lineStart": 5,
+      "lineEnd": 5,
+      "category": "missing-await",
+      "severity": "major"
+    }
+  ]
+}

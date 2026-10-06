@@ -1,0 +1,13 @@
+{
+  "description": "Session tokens are signed with a literal secret string instead of configuration.",
+  "language": "javascript",
+  "expected": [
+    {
+      "path": "src/session.js",
+      "lineStart": 4,
+      "lineEnd": 4,
+      "category": "hardcoded-secret",
+      "severity": "critical"
+    }
+  ]
+}

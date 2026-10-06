@@ -1,0 +1,5 @@
+{
+  "description": "A stock decrement done as one conditional UPDATE, safe under concurrency.",
+  "language": "python",
+  "expected": []
+}

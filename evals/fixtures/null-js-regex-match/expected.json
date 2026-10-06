@@ -1,0 +1,13 @@
+{
+  "description": "A version parser indexes into the result of String.match, which is null for bad input.",
+  "language": "javascript",
+  "expected": [
+    {
+      "path": "src/version.js",
+      "lineStart": 4,
+      "lineEnd": 4,
+      "category": "null-deref",
+      "severity": "major"
+    }
+  ]
+}

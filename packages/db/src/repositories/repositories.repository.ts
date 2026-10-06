@@ -47,6 +47,7 @@ export type RepositoriesRepository = {
     changes: { fullName?: string; isPrivate?: boolean },
   ): Promise<boolean>;
   findById(repositoryId: string): Promise<RepositoryView | null>;
+  findByFullName(fullName: string): Promise<RepositoryView | null>;
   /** One page of an installation's repos by name; `after` is the last row of the previous page. */
   listForInstallation(
     installationId: string,
@@ -172,6 +173,14 @@ export function createRepositoriesRepository(): RepositoriesRepository {
     async findById(repositoryId) {
       const doc = await RepositoryModel.findOne(
         { _id: new Types.ObjectId(repositoryId) },
+        VIEW_PROJECTION,
+      ).lean<LeanRepository>();
+      return doc ? toView(doc) : null;
+    },
+
+    async findByFullName(fullName) {
+      const doc = await RepositoryModel.findOne(
+        { fullName },
         VIEW_PROJECTION,
       ).lean<LeanRepository>();
       return doc ? toView(doc) : null;

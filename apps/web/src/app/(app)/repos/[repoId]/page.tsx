@@ -34,7 +34,7 @@ function PullRow({ repoId, pr }: { repoId: string; pr: PullRequestItem }) {
     <li>
       <Link
         href={`/repos/${repoId}/pulls/${String(pr.number)}`}
-        className="grid gap-1 px-4 py-3 transition-colors duration-150 hover:bg-surface-muted md:grid-cols-[minmax(0,1fr)_minmax(0,14rem)_7rem] md:items-center md:gap-4"
+        className="grid grid-cols-[minmax(0,1fr)] gap-1 px-4 py-3 transition-colors duration-150 hover:bg-surface-muted md:grid-cols-[minmax(0,1fr)_minmax(0,14rem)_7rem] md:items-center md:gap-4"
       >
         <span className="min-w-0">
           <span className="font-medium">
@@ -72,7 +72,10 @@ function PolicyViewer({ policy }: { policy: PolicyResponse }) {
           : `.mergemind.yml on ${policy.ref}`}
       </p>
       {policy.text === null ? null : (
-        <pre className="overflow-x-auto rounded-lg border border-border bg-surface-muted p-3 font-mono text-[13px] leading-5">
+        <pre
+          tabIndex={0}
+          className="overflow-x-auto rounded-lg border border-border bg-surface-muted p-3 font-mono text-[13px] leading-5"
+        >
           <code>{policy.text}</code>
         </pre>
       )}
@@ -125,7 +128,7 @@ export default async function RepositoryPage(props: PageProps<'/repos/[repoId]'>
         title={repo.data.fullName}
         meta={`${String(repo.data.openPullRequests)} open pull requests · reviews ${repo.data.isEnabled ? 'on' : 'off'}`}
       />
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <section aria-labelledby="pulls-heading">
           <div className="flex items-center justify-between pb-3">
             <h2 id="pulls-heading" className="text-lg leading-7 font-semibold">

@@ -1,0 +1,22 @@
+diff --git a/src/ids.js b/src/ids.js
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/ids.js
+@@ -0,0 +1,16 @@
++const { counters } = require('./db');
++
++let nextInvoice = null;
++
++async function nextInvoiceNumber() {
++  if (nextInvoice === null) {
++    const doc = await counters.findOne({ _id: 'invoice' });
++    nextInvoice = doc ? doc.value : 1000;
++  }
++  const current = nextInvoice;
++  await counters.updateOne({ _id: 'invoice' }, { $set: { value: current + 1 } }, { upsert: true });
++  nextInvoice = current + 1;
++  return current;
++}
++
++module.exports = { nextInvoiceNumber };

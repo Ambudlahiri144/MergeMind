@@ -348,3 +348,26 @@ describe('getOrgMembership (ADR-030)', () => {
     expect(await client.getOrgMembership({ org: 'octo-demo', username: 'stranger' })).toBeNull();
   });
 });
+
+describe('listReviews', () => {
+  it('lists every review on a PR with its body', async () => {
+    await client.createReview({
+      ...repo,
+      pullNumber: 9,
+      commitId: 'a'.repeat(40),
+      body: 'first',
+      comments: [],
+    });
+    await client.createReview({
+      ...repo,
+      pullNumber: 9,
+      commitId: 'a'.repeat(40),
+      body: 'second',
+      comments: [],
+    });
+
+    const reviews = await client.listReviews({ ...repo, pullNumber: 9 });
+
+    expect(reviews.map((review) => review.body)).toEqual(['first', 'second']);
+  });
+});

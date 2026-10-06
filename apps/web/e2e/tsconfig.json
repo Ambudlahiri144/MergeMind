@@ -5,5 +5,10 @@
     "types": ["node"],
     "lib": ["ES2023", "DOM"]
   },
-  "include": ["./**/*.ts", "../playwright.config.ts", "../../api/src/types/express.d.ts"]
+  "include": [
+    "./**/*.ts",
+    "../playwright.config.ts",
+    "../../api/src/types/express.d.ts",
+    "../playwright.screens.config.ts"
+  ]
 }

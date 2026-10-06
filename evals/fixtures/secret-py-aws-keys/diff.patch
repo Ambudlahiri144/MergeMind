@@ -1,0 +1,20 @@
+diff --git a/app/storage.py b/app/storage.py
+index 1111111..2222222 100644
+--- a/app/storage.py
++++ b/app/storage.py
+@@ -6,4 +6,14 @@
+ 
+ 
+ def client():
+-    return boto3.client("s3")
++    return boto3.client(
++        "s3",
++        endpoint_url="https://storage.internal.example:9000",
++        aws_access_key_id="invoice-uploader-prod",
++        aws_secret_access_key="7c41e9b2d05f8a63c1e4b7d29a0f5c38e6b1d4a7",
++    )
++
++
++def upload_invoice(name: str, data: bytes) -> str:
++    client().put_object(Bucket=BUCKET, Key=f"invoices/{name}", Body=data)
++    return f"s3://{BUCKET}/invoices/{name}"

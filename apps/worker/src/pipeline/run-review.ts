@@ -199,12 +199,15 @@ async function postReviewOnce(
   comments: readonly InlineComment[],
 ): Promise<number> {
   const { base, client, deps, run } = session;
+  // These two log lines are the chaos check's kill points (scripts/chaos-check.ts).
+  session.log.info({ runId: run.id }, 'review.publishing');
+  const existing = await client.findReviewByMarker({
+    ...base.repoRef,
+    pullNumber: base.data.prNumber,
+    marker: runMarker(run.id),
+  });
   const reviewId =
-    (await client.findReviewByMarker({
-      ...base.repoRef,
-      pullNumber: base.data.prNumber,
-      marker: runMarker(run.id),
-    })) ??
+    existing ??
     (await client.createReview({
       ...base.repoRef,
       pullNumber: base.data.prNumber,
@@ -212,6 +215,7 @@ async function postReviewOnce(
       body,
       comments,
     }));
+  session.log.info({ runId: run.id, reviewId, isAdopted: existing !== null }, 'review.posted');
   await deps.reviewRuns.setGithubReviewId(run.id, reviewId);
   return reviewId;
 }
@@ -579,6 +583,11 @@ async function reviewWithCheckRun(session: Session): Promise<ReviewOutcome> {
   const notReviewed = considered.filter((file) => !file.hasPatch).map((file) => file.path);
   if (notReviewed.length > 0) {
     session.notes.push(`Not reviewed (binary or too large to diff): ${listFiles(notReviewed)}`);
+  }
+  if (files.some((file) => file.path === POLICY_FILE_PATH && file.status !== 'removed')) {
+    session.notes.push(
+      `This PR changes \`${POLICY_FILE_PATH}\`; the change applies after it is merged. This review used the policy on \`${base.data.baseRef}\`.`,
+    );
   }
   if (reviewable.length === 0) {
     return finish(session, {

@@ -34,7 +34,7 @@ type Installation = MeResponse['installations'][number];
 
 function RepositoryRow({ repo, canAdmin }: { repo: RepositoryItem; canAdmin: boolean }) {
   return (
-    <li className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_9rem_6rem_7rem_minmax(0,13rem)] md:items-center md:gap-4">
+    <li className="grid grid-cols-[minmax(0,1fr)] gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_9rem_6rem_7rem_minmax(0,13rem)] md:items-center md:gap-4">
       <div className="min-w-0">
         <Link href={`/repos/${repo.id}`} className="font-medium hover:text-accent">
           <span className="truncate">{repo.fullName}</span>

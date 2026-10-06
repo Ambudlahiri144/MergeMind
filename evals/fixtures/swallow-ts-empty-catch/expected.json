@@ -1,0 +1,13 @@
+{
+  "description": "A settings save catches every error and returns true, so failures are reported as success.",
+  "language": "typescript",
+  "expected": [
+    {
+      "path": "src/settings/save.ts",
+      "lineStart": 6,
+      "lineEnd": 8,
+      "category": "swallowed-error",
+      "severity": "major"
+    }
+  ]
+}

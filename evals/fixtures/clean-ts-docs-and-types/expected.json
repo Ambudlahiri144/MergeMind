@@ -1,0 +1,5 @@
+{
+  "description": "Adds types and doc comments to an existing module; behaviour is unchanged.",
+  "language": "typescript",
+  "expected": []
+}

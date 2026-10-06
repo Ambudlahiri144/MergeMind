@@ -1,0 +1,20 @@
+diff --git a/src/payments/client.ts b/src/payments/client.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/payments/client.ts
+@@ -0,0 +1,14 @@
++import Stripe from 'stripe';
++
++const PAYMENTS_SECRET_KEY = 'pay_secret_prod_9f2c71d4e8b3a60b5e1d7c4a2f8e6b3d';
++
++export const stripe = new Stripe(PAYMENTS_SECRET_KEY, { apiVersion: '2026-06-30' });
++
++export async function chargeCard(customerId: string, amountInPaise: number) {
++  return stripe.paymentIntents.create({
++    customer: customerId,
++    amount: amountInPaise,
++    currency: 'inr',
++    confirm: true,
++  });
++}

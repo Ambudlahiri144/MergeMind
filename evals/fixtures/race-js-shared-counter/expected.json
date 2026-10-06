@@ -1,0 +1,13 @@
+{
+  "description": "Concurrent requests increment a module-level counter that is read and written across an await.",
+  "language": "javascript",
+  "expected": [
+    {
+      "path": "src/ids.js",
+      "lineStart": 10,
+      "lineEnd": 12,
+      "category": "race-condition",
+      "severity": "major"
+    }
+  ]
+}

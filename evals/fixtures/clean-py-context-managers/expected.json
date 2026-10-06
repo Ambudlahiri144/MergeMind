@@ -1,0 +1,5 @@
+{
+  "description": "File and database access wrapped in context managers, with explicit error handling.",
+  "language": "python",
+  "expected": []
+}

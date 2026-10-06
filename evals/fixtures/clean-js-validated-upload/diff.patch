@@ -1,0 +1,24 @@
+diff --git a/src/routes/avatar.js b/src/routes/avatar.js
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/routes/avatar.js
+@@ -0,0 +1,18 @@
++const crypto = require('node:crypto');
++const path = require('node:path');
++
++const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp']);
++const MAX_BYTES = 2 * 1024 * 1024;
++const AVATARS = path.resolve('uploads', 'avatars');
++
++async function uploadAvatar(req, res, storage) {
++  const file = req.file;
++  if (!file || !ALLOWED.has(file.mimetype) || file.size > MAX_BYTES) {
++    return res.status(400).json({ error: 'Upload a PNG, JPEG or WebP under 2 MB' });
++  }
++  const name = `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`;
++  await storage.save(path.join(AVATARS, name), file.buffer);
++  return res.status(201).json({ name });
++}
++
++module.exports = { uploadAvatar };

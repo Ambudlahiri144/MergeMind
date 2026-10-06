@@ -1,0 +1,15 @@
+diff --git a/src/rates.js b/src/rates.js
+index 1111111..2222222 100644
+--- a/src/rates.js
++++ b/src/rates.js
+@@ -1,3 +1,9 @@
+ const RATES_URL = 'https://api.example.com/rates';
+ 
+-module.exports = { RATES_URL };
++async function fetchInrRate() {
++  const response = await fetch(`${RATES_URL}?base=USD&symbols=INR`);
++  const body = response.json();
++  return body.rates.INR;
++}
++
++module.exports = { RATES_URL, fetchInrRate };

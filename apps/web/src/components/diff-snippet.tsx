@@ -26,7 +26,10 @@ export function DiffSnippet({
         <span className="truncate font-mono">{snippet.path}</span>
         <span className="shrink-0 font-mono text-text-muted">{shortSha(snippet.ref)}</span>
       </figcaption>
-      <pre className="overflow-x-auto bg-surface-muted py-2 font-mono text-[13px] leading-5">
+      <pre
+        tabIndex={0}
+        className="overflow-x-auto bg-surface-muted py-2 font-mono text-[13px] leading-5"
+      >
         <code className="block min-w-max">
           {snippet.lines.map((line) => {
             const isFlagged =

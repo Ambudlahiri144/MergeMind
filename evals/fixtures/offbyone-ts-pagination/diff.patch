@@ -1,0 +1,14 @@
+diff --git a/src/lib/paginate.ts b/src/lib/paginate.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/lib/paginate.ts
+@@ -0,0 +1,8 @@
++export type Page<T> = { items: T[]; page: number; pageCount: number };
++
++export function paginate<T>(items: readonly T[], page: number, size: number): Page<T> {
++  const pageCount = Math.ceil(items.length / size);
++  const safePage = Math.min(Math.max(page, 1), pageCount + 1);
++  const start = (safePage - 1) * size;
++  return { items: items.slice(start, start + size), page: safePage, pageCount };
++}

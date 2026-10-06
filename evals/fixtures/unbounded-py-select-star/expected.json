@@ -1,0 +1,13 @@
+{
+  "description": "A notification job selects every user row without pagination before filtering in Python.",
+  "language": "python",
+  "expected": [
+    {
+      "path": "app/jobs/notify.py",
+      "lineStart": 7,
+      "lineEnd": 7,
+      "category": "unbounded-query",
+      "severity": "major"
+    }
+  ]
+}

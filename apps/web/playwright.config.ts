@@ -8,6 +8,8 @@ const STACK_STARTUP_MS = 300_000;
 // `next dev` with the test sign-in seam; Playwright waits for the sign-in page.
 export default defineConfig({
   testDir: './e2e',
+  // Screenshot capture has its own config (playwright.screens.config.ts).
+  testIgnore: ['**/screens/**'],
   fullyParallel: false,
   workers: 1,
   timeout: 90_000,

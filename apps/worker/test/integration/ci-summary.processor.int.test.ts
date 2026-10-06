@@ -134,6 +134,7 @@ async function createScenario(
     githubRepoId,
     fullName,
     isPrivate: options.isPrivate ?? false,
+    defaultBranch: 'main',
   });
   const job: FakeJob = {
     id: nextId,
@@ -348,7 +349,7 @@ describe('ci-summary.run (PRD F10)', () => {
   it('respects ciSummary.enabled: false in .mergemind.yml', async () => {
     const scenario = await createScenario();
     fakeGithub.fileContents.set(
-      `${scenario.fullName}@${HEAD_SHA}:.mergemind.yml`,
+      `${scenario.fullName}@main:.mergemind.yml`,
       'version: 1\nciSummary:\n  enabled: false\n',
     );
 

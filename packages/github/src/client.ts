@@ -82,6 +82,8 @@ export type GithubInstallationClient = {
       summary: string;
     },
   ): Promise<void>;
+  /** Every review on the PR (id and body), bounded; the chaos check counts run markers. */
+  listReviews(input: RepoRef & { pullNumber: number }): Promise<{ id: number; body: string }[]>;
   /** The id of an existing review whose body contains `marker`, if any (ADR-018). */
   findReviewByMarker(
     input: RepoRef & { pullNumber: number; marker: string },
@@ -271,6 +273,25 @@ function createInstallationClient(octokit: ReviewOctokitInstance): GithubInstall
           completed_at: new Date().toISOString(),
           output: { title, summary },
         });
+      }),
+
+    listReviews: ({ owner, repo, pullNumber }) =>
+      callGithub('listReviews', async () => {
+        const reviews: { id: number; body: string }[] = [];
+        for (let page = 1; page <= MAX_REVIEW_PAGES; page += 1) {
+          const { data } = await octokit.rest.pulls.listReviews({
+            owner,
+            repo,
+            pull_number: pullNumber,
+            per_page: PER_PAGE,
+            page,
+          });
+          reviews.push(...data.map((review) => ({ id: review.id, body: review.body })));
+          if (data.length < PER_PAGE) {
+            break;
+          }
+        }
+        return reviews;
       }),
 
     findReviewByMarker: ({ owner, repo, pullNumber, marker }) =>

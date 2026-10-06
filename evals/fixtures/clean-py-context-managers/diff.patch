@@ -1,0 +1,26 @@
+diff --git a/app/backup.py b/app/backup.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/app/backup.py
+@@ -0,0 +1,20 @@
++import json
++import logging
++import sqlite3
++from pathlib import Path
++
++logger = logging.getLogger(__name__)
++
++
++def export_orders(db_path: str, out: Path, limit: int = 1000) -> int:
++    with sqlite3.connect(db_path) as conn:
++        rows = conn.execute(
++            "SELECT id, total, created_at FROM orders ORDER BY id DESC LIMIT ?", (limit,)
++        ).fetchall()
++    try:
++        with out.open("w", encoding="utf-8") as handle:
++            json.dump([list(row) for row in rows], handle)
++    except OSError:
++        logger.exception("backup.writeFailed path=%s", out)
++        raise
++    return len(rows)

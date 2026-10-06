@@ -1,0 +1,15 @@
+diff --git a/src/routes/profile.js b/src/routes/profile.js
+index 1111111..2222222 100644
+--- a/src/routes/profile.js
++++ b/src/routes/profile.js
+@@ -4,4 +4,9 @@
+   res.json(await users.findOne({ _id: req.user.id }, { projection: { name: 1, bio: 1 } }));
+ }
+ 
+-module.exports = { getProfile };
++async function updateProfile(req, res) {
++  await users.updateOne({ _id: req.user.id }, { $set: req.body });
++  res.status(204).end();
++}
++
++module.exports = { getProfile, updateProfile };

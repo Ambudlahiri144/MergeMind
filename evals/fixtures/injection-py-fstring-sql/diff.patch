@@ -1,0 +1,22 @@
+diff --git a/app/orders.py b/app/orders.py
+index 1111111..2222222 100644
+--- a/app/orders.py
++++ b/app/orders.py
+@@ -1,4 +1,4 @@
+-from flask import Blueprint, jsonify
++from flask import Blueprint, jsonify, request
+ 
+ from .db import get_connection
+ 
+@@ -10,3 +10,11 @@
+     with get_connection() as conn:
+         rows = conn.execute("SELECT id, total FROM orders ORDER BY id DESC LIMIT 20").fetchall()
+     return jsonify([dict(row) for row in rows])
++
++
++@bp.get("/orders/lookup")
++def lookup_order():
++    order_id = request.args.get("id", "")
++    with get_connection() as conn:
++        row = conn.execute(f"SELECT id, total, status FROM orders WHERE id = {order_id}").fetchone()
++    return jsonify(dict(row) if row else {})

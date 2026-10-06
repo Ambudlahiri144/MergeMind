@@ -1,0 +1,17 @@
+diff --git a/app/webhooks.py b/app/webhooks.py
+index 1111111..2222222 100644
+--- a/app/webhooks.py
++++ b/app/webhooks.py
+@@ -5,3 +5,12 @@
+ class Delivery:
+     event: str
+     repo: str
++    sender: str
++
++
++def parse_delivery(payload: dict) -> Delivery:
++    return Delivery(
++        event=payload.get("action", "unknown"),
++        repo=payload["repository"]["full_name"],
++        sender=payload.get("sender").get("login"),
++    )

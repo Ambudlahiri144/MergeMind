@@ -1,6 +1,6 @@
 # MergeMind: Design System
 
-> Derived from the installed **Taste-skill** (`.agents/skills/design-taste-frontend/SKILL.md`, by Leonxlnx, MIT) and its sibling **minimalist-ui** (`.agents/skills/minimalist-ui/SKILL.md`). Where this file and a skill disagree, **this file wins** for MergeMind.
+> Derived from the installed **Taste-skill** (`.agents/skills/design-taste-frontend/SKILL.md`, by Leonxlnx, MIT), its sibling **minimalist-ui** (`.agents/skills/minimalist-ui/SKILL.md`), and **UI/UX Pro Max** (`nextlevelbuilder/ui-ux-pro-max-skill`, pinned in `skills-lock.json`). Where this file and a skill disagree, **this file wins** for MergeMind.
 
 ---
 
@@ -12,6 +12,7 @@ The Taste-skill itself says it is for landing pages and portfolios, **not** dens
 |---|---|
 | **Landing page** (`/`) | Full Taste-skill: brief inference, dials, hero discipline, pre-flight check (Section 14 of the skill) |
 | **App screens** (`/repos`, PR, run, settings) | Tokens and components in this file + minimalist-ui component specs. Taste-skill rules on color lock, shape lock, contrast, em-dash ban, icons and copy still apply. |
+| **Both** | UI/UX Pro Max supplies product-type reasoning, landing section patterns, anti-pattern checks and its UX and accessibility checklists. Its palette, font, icon-set and motion suggestions are not used: this file's tokens, Geist, Phosphor and near-static motion win. |
 
 **Design read:** *Reading this as: a developer-tool product site plus a quiet web app for engineers and tech leads, with a calm, trustworthy, Linear-style minimalist language, leaning toward shadcn/ui on Tailwind v4 + Geist + near-static motion.*
 
@@ -84,7 +85,7 @@ Hierarchy comes from weight and color, not raw size. No oversized H1s inside the
 
 ### 2.4 Spacing, layout and breakpoints
 - **Base unit 4px.** Use the Tailwind scale only; no arbitrary pixel values except tokens.
-- **App container:** `max-w-6xl mx-auto px-4 md:px-6`. **Landing container:** `max-w-5xl`.
+- **App container:** `max-w-6xl mx-auto px-4 md:px-6`. **Landing container:** the same `max-w-6xl`, so the split hero fits a two-line headline next to a readable product screenshot.
 - **Vertical rhythm:** app sections `py-8`, landing sections `py-16 md:py-24`.
 - **Breakpoints (Tailwind defaults):** `sm 640`, `md 768`, `lg 1024`, `xl 1280`.
   - `< 768px`: **single column always**. Tables become stacked rows, and side panels move below content.

@@ -1,0 +1,13 @@
+diff --git a/src/cart/apply-coupon.ts b/src/cart/apply-coupon.ts
+index 1111111..2222222 100644
+--- a/src/cart/apply-coupon.ts
++++ b/src/cart/apply-coupon.ts
+@@ -4,3 +4,8 @@
+   { code: 'DIWALI10', percentOff: 10 },
+   { code: 'WELCOME5', percentOff: 5 },
+ ];
++
++export function applyCoupon(total: number, code: string): number {
++  const coupon = COUPONS.find((candidate) => candidate.code === code.toUpperCase());
++  return total - (total * coupon!.percentOff) / 100;
++}
