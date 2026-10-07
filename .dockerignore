@@ -1,0 +1,36 @@
+# Keep secrets, local-only docs and build output out of the image context (Deploy.md).
+.git
+**/node_modules
+**/dist
+**/.next
+**/.next-e2e
+**/*.tsbuildinfo
+**/next-env.d.ts
+**/coverage
+**/playwright-report
+**/test-results
+evals/reports
+
+# env and secrets: never in an image
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+
+# local agent state and working docs
+.claude
+.agents
+AGENTS.md
+CLAUDE.md
+Decisions.md
+memory.md
+rules.md
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
+
+# not needed by the api or worker
+apps/web/public
+apps/web/e2e
+deploy
+*.log

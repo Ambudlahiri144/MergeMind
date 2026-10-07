@@ -86,6 +86,10 @@ Precision counts critical and major reports; recall counts seeded critical and m
    ```
 5. Install the App on a repository, open a pull request, and sign in at `http://localhost:3000`.
 
+## Deploy
+
+The backend (api, worker, Redis, Ollama, Caddy for HTTPS) runs on one free VM with Docker Compose, and the web app on Vercel. [Deploy.md](Deploy.md) walks through it: the VM, `deploy/deploy.sh`, the Vercel settings and pointing the GitHub App at production.
+
 ## Development
 
 | Command | What it does |

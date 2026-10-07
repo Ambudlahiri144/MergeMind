@@ -401,10 +401,27 @@ persona: "Senior backend reviewer. Concise. Cite exact lines."
 | api | `npm run dev -w @mergemind/api` | 4000 |
 | web | `npm run dev -w @mergemind/web` | 3000 |
 | worker | `npm run dev -w @mergemind/worker` | none |
-| Webhook proxy | `npx -p smee-client smee -u $SMEE_URL -t http://localhost:4000/webhooks/github` | |
+| Webhook proxy | `npx -p smee-client smee -u $SMEE_URL -t http://localhost:4000/webhooks/github` (only for a development App; production webhooks go to the VM) | |
 
 ### Environment variables (see `.env.example`)
 `NODE_ENV`, `LOG_LEVEL`, `API_PORT` (default 4000), `MONGO_HOST_PORT` / `REDIS_HOST_PORT` (docker compose host ports, default 27017 / 6379), `MONGODB_URI`, `REDIS_URL`, `REVIEW_CONCURRENCY` / `INDEX_CONCURRENCY` / `CI_SUMMARY_CONCURRENCY` (worker, defaults 4 / 1 / 2), `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (PEM, `\n`-escaped), `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` (the App's OAuth client, for web sign-in), `GITHUB_APP_SLUG` (install links), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (web), `API_JWT_SECRET` (web and api), `API_RATE_LIMIT_PER_MINUTE` (api, default 120), `API_BASE_URL`, `MERGEMIND_E2E` (test-only sign-in seam, refused in production), `GROQ_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OLLAMA_BASE_URL`, `LLM_PRIMARY_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_LOCAL_MODEL`, `LLM_TIMEOUT_MS`, `EMBEDDING_MODEL` (default `nomic-embed-text`), `INDEX_MAX_FILES` / `INDEX_MAX_FILE_BYTES` (defaults 1,500 / 200,000), `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`, `LANGFUSE_REDACT_INPUTS`, `SMEE_URL`.
+
+---
+
+## 7a. Production deployment (Deploy.md, ADR-037)
+
+| Component | Where | Notes |
+|---|---|---|
+| web (`apps/web`) | Vercel, region `bom1` | `apps/web/vercel.json`; calls the api server-side only |
+| api, worker | one VM, Docker Compose (`deploy/compose.prod.yml`) | one image, two targets (`Dockerfile`); production loads `dist/` (ADR-015) |
+| Redis | same VM, internal only | AOF + `noeviction` |
+| Ollama | same VM, internal only | embeddings only (`nomic-embed-text`) |
+| Caddy | same VM, ports 80/443 | Let's Encrypt for `API_DOMAIN`; proxies `/webhooks/github` and `/api/v1/*` to the api |
+| MongoDB | Atlas M0 | VM IP allowlisted |
+
+- **Traffic:** GitHub → Caddy → api (webhooks); browser → Vercel → Caddy → api (5-minute JWT). The browser never calls the api directly.
+- **Releases:** `bash deploy/deploy.sh [ref]` on the VM (pull, build, up, model pull, readiness check); Vercel deploys on push to `main` when the web app or `packages/shared` changed.
+- **CI** builds both image targets on every push and PR (`image` job).
 
 ---
 

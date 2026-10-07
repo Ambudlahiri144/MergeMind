@@ -44,6 +44,18 @@ jobs:
       - run: npm ci
       - run: npm run test:int
 
+  image:
+    name: Backend image builds (api, worker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      # The production image (Deploy.md); the VM builds the same Dockerfile on arm64.
+      - run: docker build --target api -t mergemind-api:ci .
+      - run: docker build --target worker -t mergemind-worker:ci .
+      - name: The worker boots far enough to read its config
+        run: docker run --rm mergemind-worker:ci node -e "import('./apps/worker/dist/config/env.js').then(()=>console.log('worker dist loads'))"
+
   e2e:
     name: E2E + accessibility (Playwright, axe)
     runs-on: ubuntu-latest

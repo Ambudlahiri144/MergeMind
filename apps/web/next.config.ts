@@ -32,6 +32,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: repoRoot,
   },
+  // Monorepo: trace server files from the repo root so Vercel's deployment includes
+  // packages/shared/dist (Deploy.md). Must match turbopack.root.
+  outputFileTracingRoot: repoRoot,
 };
 
 export default nextConfig;
