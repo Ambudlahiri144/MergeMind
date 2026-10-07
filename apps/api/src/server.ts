@@ -14,7 +14,7 @@ import {
   pingMongo,
 } from '@mergemind/db';
 import { createGithubApp, type GithubApp } from '@mergemind/github';
-import { registerGracefulShutdown } from '@mergemind/shared';
+import { BOOT_RECOVERY_DELAY_MS, registerGracefulShutdown } from '@mergemind/shared';
 import { createLogger } from '@mergemind/shared/logger';
 import { Redis } from 'ioredis';
 
@@ -24,6 +24,7 @@ import { createCiSummaryProducer } from './queues/ci-summary.producer.js';
 import { createIndexProducer } from './queues/index.producer.js';
 import { createReviewProducer } from './queues/review.producer.js';
 import { createAccessService } from './services/access.service.js';
+import { redeliverFailedWebhooks } from './services/redelivery.service.js';
 import { createWebhookService } from './services/webhook.service.js';
 
 const env = loadApiEnv();
@@ -109,6 +110,17 @@ async function main(): Promise<void> {
     }
     logger.info({ port: env.API_PORT }, 'server.started');
   });
+
+  if (env.WEBHOOK_REDELIVERY_ON_BOOT && github !== null) {
+    const appClient = github;
+    setTimeout(() => {
+      redeliverFailedWebhooks({ github: appClient, logger, now: () => new Date() }).catch(
+        (error: unknown) => {
+          logger.error({ err: error }, 'webhook.redeliveryPassFailed');
+        },
+      );
+    }, BOOT_RECOVERY_DELAY_MS).unref();
+  }
 
   registerGracefulShutdown(logger, [
     {

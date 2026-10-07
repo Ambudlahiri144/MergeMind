@@ -404,14 +404,30 @@ persona: "Senior backend reviewer. Concise. Cite exact lines."
 | Webhook proxy | `npx -p smee-client smee -u $SMEE_URL -t http://localhost:4000/webhooks/github` (only for a development App; production webhooks go to the VM) | |
 
 ### Environment variables (see `.env.example`)
-`NODE_ENV`, `LOG_LEVEL`, `API_PORT` (default 4000), `MONGO_HOST_PORT` / `REDIS_HOST_PORT` (docker compose host ports, default 27017 / 6379), `MONGODB_URI`, `REDIS_URL`, `REVIEW_CONCURRENCY` / `INDEX_CONCURRENCY` / `CI_SUMMARY_CONCURRENCY` (worker, defaults 4 / 1 / 2), `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (PEM, `\n`-escaped), `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` (the App's OAuth client, for web sign-in), `GITHUB_APP_SLUG` (install links), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (web), `API_JWT_SECRET` (web and api), `API_RATE_LIMIT_PER_MINUTE` (api, default 120), `API_BASE_URL`, `MERGEMIND_E2E` (test-only sign-in seam, refused in production), `GROQ_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OLLAMA_BASE_URL`, `LLM_PRIMARY_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_LOCAL_MODEL`, `LLM_TIMEOUT_MS`, `EMBEDDING_MODEL` (default `nomic-embed-text`), `INDEX_MAX_FILES` / `INDEX_MAX_FILE_BYTES` (defaults 1,500 / 200,000), `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`, `LANGFUSE_REDACT_INPUTS`, `SMEE_URL`.
+`NODE_ENV`, `LOG_LEVEL`, `API_PORT` (default 4000), `MONGO_HOST_PORT` / `REDIS_HOST_PORT` (docker compose host ports, default 27017 / 6379), `MONGODB_URI`, `REDIS_URL`, `REVIEW_CONCURRENCY` / `INDEX_CONCURRENCY` / `CI_SUMMARY_CONCURRENCY` (worker, defaults 4 / 1 / 2), `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` (PEM, `\n`-escaped), `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` (the App's OAuth client, for web sign-in), `GITHUB_APP_SLUG` (install links), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (web), `API_JWT_SECRET` (web and api), `API_RATE_LIMIT_PER_MINUTE` (api, default 120), `API_BASE_URL`, `MERGEMIND_E2E` (test-only sign-in seam, refused in production), `GROQ_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OLLAMA_BASE_URL`, `LLM_PRIMARY_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_LOCAL_MODEL`, `LLM_TIMEOUT_MS`, `EMBEDDING_MODEL` (default `nomic-embed-text`), `INDEX_MAX_FILES` / `INDEX_MAX_FILE_BYTES` (defaults 1,500 / 200,000), `INDEX_ENABLED` (worker, default true), `RECONCILE_ON_BOOT` (worker) and `WEBHOOK_REDELIVERY_ON_BOOT` (api) (default false; true on Render, ADR-038), `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`, `LANGFUSE_REDACT_INPUTS`, `SMEE_URL`.
 
 ---
 
-## 7a. Production deployment (Deploy.md, ADR-037)
+## 7a. Production deployment (Deploy.md, ADR-038)
 
 | Component | Where | Notes |
 |---|---|---|
+| web (`apps/web`) | Vercel, region `sin1` | `apps/web/vercel.json`; calls the api server-side only |
+| api + worker + Redis | one Render free web service (Singapore), Docker | `render.yaml`; the `Dockerfile`'s default `render` target; `deploy/render/start.sh` supervises the three processes under tini |
+| Redis | in the same container, memory only | `noeviction`, 48 MB; emptied on every restart |
+| Ollama / code index | none | `INDEX_ENABLED=false`: index jobs are skipped; reviews run without retrieval |
+| MongoDB | Atlas M0 | `0.0.0.0/0` allowlist (no static egress on Render free) with a `readWrite`-on-`mergemind` user |
+| Keep-alive | cron-job.org | `GET /api/v1/health` every 10 min (Render free sleeps after 15 min idle) |
+
+- **Traffic:** GitHub → Render → api (webhooks); browser → Vercel → Render → api (5-minute JWT). The browser never calls the api directly.
+- **Boot recovery** (about 60 s after start, `BOOT_RECOVERY_DELAY_MS`):
+  - the api redelivers App webhooks from the last 24 h with no 2xx attempt (`WEBHOOK_REDELIVERY_ON_BOOT`, at most 20);
+  - the worker re-enqueues open PRs whose head has no finished run (`RECONCILE_ON_BOOT`, at most 100 PRs updated in the last 7 days).
+- **Releases:** a push to `main` deploys on Render after CI passes (`autoDeployTrigger: checksPass`) and on Vercel when the web app or `packages/shared` changed.
+- **CI** builds the `api`, `worker` and `render` image targets and imports every compiled module inside the image (`image` job).
+- **Self-hosting alternative:** `deploy/compose.prod.yml` (api, worker, Redis with AOF, Ollama, Caddy) on any VM. It is described in the Deploy.md appendix (ADR-037).
+
+---|---|---|
 | web (`apps/web`) | Vercel, region `bom1` | `apps/web/vercel.json`; calls the api server-side only |
 | api, worker | one VM, Docker Compose (`deploy/compose.prod.yml`) | one image, two targets (`Dockerfile`); production loads `dist/` (ADR-015) |
 | Redis | same VM, internal only | AOF + `noeviction` |

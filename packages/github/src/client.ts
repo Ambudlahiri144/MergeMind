@@ -133,6 +133,7 @@ export type GithubInstallationClient = {
   /** PRs whose commits include `sha`; finds fork PRs, which `workflow_run` does not link. */
   listPullRequestsForCommit(input: RepoRef & { sha: string }): Promise<PullRequestRef[]>;
   getPullRequestState(input: RepoRef & { pullNumber: number }): Promise<PullRequestRef>;
+  getPullRequest(input: RepoRef & { pullNumber: number }): Promise<PullRequestDetail>;
   /** The PR conversation comment whose body contains `marker`, if any (ADR-028). */
   findIssueCommentByMarker(
     input: RepoRef & { issueNumber: number; marker: string },
@@ -158,6 +159,17 @@ export type WorkflowJob = {
 
 export type PullRequestRef = { number: number; state: 'open' | 'closed'; headSha: string };
 
+/** A PR's live state, enough to build a review job (boot reconciliation, ADR-038). */
+export type PullRequestDetail = PullRequestRef & {
+  isDraft: boolean;
+  title: string;
+  authorLogin: string;
+  baseRef: string;
+  headRef: string;
+  baseSha: string;
+  updatedAt: Date;
+};
+
 export const COMPARE_STATUSES = ['ahead', 'behind', 'diverged', 'identical'] as const;
 export type CompareStatus = (typeof COMPARE_STATUSES)[number];
 
@@ -178,9 +190,27 @@ export type PullComment = {
   inReplyToId: number | null;
 };
 
+/** One attempt to deliver an App webhook, as GitHub recorded it (`GET /app/hook/deliveries`). */
+export type WebhookDelivery = {
+  id: number;
+  /** `X-GitHub-Delivery`: shared by an event's original delivery and its redeliveries. */
+  guid: string;
+  deliveredAt: Date;
+  /** HTTP status the receiver answered; 0 when the attempt timed out or never connected. */
+  statusCode: number;
+  event: string;
+};
+
+/** Newest-first pages of 100; a scan stops at `since` or after this many pages. */
+export const MAX_DELIVERY_PAGES = 2;
+
 export type GithubApp = {
   getInstallationAccount(installationId: number): Promise<{ login: string; type: AccountType }>;
   forInstallation(installationId: number): Promise<GithubInstallationClient>;
+  /** App webhook deliveries since `since`, newest first, bounded (ADR-038). */
+  listWebhookDeliveries(since: Date): Promise<WebhookDelivery[]>;
+  /** Ask GitHub to send a delivery again (same GUID). */
+  redeliverWebhook(deliveryId: number): Promise<void>;
 };
 
 export type GithubAppOptions = {
@@ -539,6 +569,23 @@ function createInstallationClient(octokit: ReviewOctokitInstance): GithubInstall
         };
       }),
 
+    getPullRequest: ({ owner, repo, pullNumber }) =>
+      callGithub('getPullRequest', async () => {
+        const { data } = await octokit.rest.pulls.get({ owner, repo, pull_number: pullNumber });
+        return {
+          number: data.number,
+          state: data.state === 'open' ? ('open' as const) : ('closed' as const),
+          headSha: data.head.sha,
+          isDraft: data.draft ?? false,
+          title: data.title,
+          authorLogin: data.user.login,
+          baseRef: data.base.ref,
+          headRef: data.head.ref,
+          baseSha: data.base.sha,
+          updatedAt: new Date(data.updated_at),
+        };
+      }),
+
     findIssueCommentByMarker: ({ owner, repo, issueNumber, marker }) =>
       callGithub('listIssueComments', async () => {
         for (let page = 1; page <= MAX_COMMENT_PAGES * 2; page += 1) {
@@ -749,5 +796,42 @@ export function createGithubApp(options: GithubAppOptions): GithubApp {
       const octokit = await app.getInstallationOctokit(installationId);
       return createInstallationClient(octokit);
     },
+
+    listWebhookDeliveries: (since) =>
+      callGithub('listWebhookDeliveries', async () => {
+        const deliveries: WebhookDelivery[] = [];
+        let pages = 0;
+        for await (const { data } of app.octokit.paginate.iterator('GET /app/hook/deliveries', {
+          per_page: 100,
+        })) {
+          pages += 1;
+          let isPastWindow = false;
+          for (const item of data) {
+            const deliveredAt = new Date(item.delivered_at);
+            if (deliveredAt < since) {
+              isPastWindow = true;
+              break;
+            }
+            deliveries.push({
+              id: item.id,
+              guid: item.guid,
+              deliveredAt,
+              statusCode: item.status_code,
+              event: item.event,
+            });
+          }
+          if (isPastWindow || pages >= MAX_DELIVERY_PAGES) {
+            break;
+          }
+        }
+        return deliveries;
+      }),
+
+    redeliverWebhook: (deliveryId) =>
+      callGithub('redeliverWebhook', async () => {
+        await app.octokit.request('POST /app/hook/deliveries/{delivery_id}/attempts', {
+          delivery_id: deliveryId,
+        });
+      }),
   };
 }

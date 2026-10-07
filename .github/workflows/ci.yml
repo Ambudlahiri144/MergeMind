@@ -53,8 +53,17 @@ jobs:
       # The production image (Deploy.md); the VM builds the same Dockerfile on arm64.
       - run: docker build --target api -t mergemind-api:ci .
       - run: docker build --target worker -t mergemind-worker:ci .
-      - name: The worker boots far enough to read its config
-        run: docker run --rm mergemind-worker:ci node -e "import('./apps/worker/dist/config/env.js').then(()=>console.log('worker dist loads'))"
+      # The default target: api + worker + Redis in one container (Render, ADR-038).
+      - run: docker build -t mergemind-render:ci .
+      # Import every compiled module (except the two entrypoints) inside the production image,
+      # so a dependency missing from the image fails here, not on the server.
+      - name: Every api and worker module resolves in the image
+        run: >-
+          docker run --rm mergemind-render:ci node -e "
+          const fs=require('fs'),path=require('path');
+          const files=['apps/api/dist','apps/worker/dist'].flatMap(d=>fs.readdirSync(d,{recursive:true}).filter(f=>f.endsWith('.js')).map(f=>path.resolve(d,f)));
+          const skip=/[\/](server|main)\.js$/;
+          Promise.all(files.filter(f=>!skip.test(f)).map(f=>import(f))).then(m=>console.log('resolved',m.length,'modules'),e=>{console.error(e);process.exit(1)})"
 
   e2e:
     name: E2E + accessibility (Playwright, axe)

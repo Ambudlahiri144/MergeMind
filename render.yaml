@@ -1,0 +1,70 @@
+# Render Blueprint for the MergeMind backend (Deploy.md, ADR-038).
+# One free web service runs api + worker + Redis in one container (the Dockerfile's default
+# target). The web app is deployed separately on Vercel.
+services:
+  - type: web
+    name: mergemind-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    branch: main
+    # Deploy a commit to main only after its CI checks pass.
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/api/**
+        - apps/worker/**
+        - packages/**
+        - package.json
+        - package-lock.json
+        - Dockerfile
+        - .dockerignore
+        - deploy/render/**
+      ignoredPaths:
+        - '**/*.test.ts'
+        - '**/test/**'
+        - '**/*.md'
+    envVars:
+      # Small, ephemeral host (ADR-038).
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: INDEX_ENABLED
+        value: 'false'
+      - key: RECONCILE_ON_BOOT
+        value: 'true'
+      - key: WEBHOOK_REDELIVERY_ON_BOOT
+        value: 'true'
+      - key: REVIEW_CONCURRENCY
+        value: '1'
+      - key: CI_SUMMARY_CONCURRENCY
+        value: '1'
+      - key: LLM_PASS_CONCURRENCY
+        value: '3'
+      - key: LLM_PRIMARY_MODEL
+        value: openai/gpt-oss-120b
+      - key: LLM_FALLBACK_MODEL
+        value: gemini-3.5-flash-lite
+      # Secrets: Render asks for each value when the Blueprint is created (never in git).
+      - key: MONGODB_URI
+        sync: false
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+      - key: API_JWT_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GOOGLE_GENERATIVE_AI_API_KEY
+        sync: false
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false

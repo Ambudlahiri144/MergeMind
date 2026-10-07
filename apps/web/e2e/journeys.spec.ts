@@ -112,11 +112,14 @@ test('dark theme is accessible and persists across a reload', async ({ signedIn:
   });
   await page.getByRole('button', { name: /^Theme: light/ }).click();
   await expect(html).toHaveAttribute('data-theme', 'dark');
-  // The cookie is written by a server action; wait until a fresh request sees it.
+  // The toggle writes the cookie in the browser; wait until a fresh request sees it.
   await expect(async () => {
     await page.reload();
     await expect(html).toHaveAttribute('data-theme', 'dark', { timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
+  // Audit the settled page: CI once caught an ARIA attribute on <html> mid-reload.
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('button', { name: /^Theme: dark/ })).toBeVisible();
 
   await expectAccessible(page);
 });

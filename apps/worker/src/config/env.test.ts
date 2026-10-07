@@ -19,6 +19,16 @@ describe('loadWorkerEnv', () => {
     });
   });
 
+  it('keeps the code index on and boot reconciliation off unless a host opts in', () => {
+    expect(loadWorkerEnv(REQUIRED)).toMatchObject({
+      INDEX_ENABLED: true,
+      RECONCILE_ON_BOOT: false,
+    });
+    expect(
+      loadWorkerEnv({ ...REQUIRED, INDEX_ENABLED: 'false', RECONCILE_ON_BOOT: 'true' }),
+    ).toMatchObject({ INDEX_ENABLED: false, RECONCILE_ON_BOOT: true });
+  });
+
   it('rejects a non-redis REDIS_URL', () => {
     expect(() => loadWorkerEnv({ ...REQUIRED, REDIS_URL: 'http://localhost:6379' })).toThrow(
       EnvValidationError,

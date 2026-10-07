@@ -371,3 +371,74 @@ describe('listReviews', () => {
     expect(reviews.map((review) => review.body)).toEqual(['first', 'second']);
   });
 });
+
+describe('webhook deliveries (ADR-038)', () => {
+  const now = new Date('2026-10-08T12:00:00Z');
+  const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString();
+
+  it('lists deliveries newest first and stops at the window start', async () => {
+    fake.webhookDeliveries.push(
+      { id: 3, guid: 'g-3', delivered_at: minutesAgo(5), status_code: 202, event: 'pull_request' },
+      { id: 2, guid: 'g-2', delivered_at: minutesAgo(30), status_code: 0, event: 'pull_request' },
+      { id: 1, guid: 'g-1', delivered_at: minutesAgo(600), status_code: 502, event: 'push' },
+    );
+
+    const deliveries = await app.listWebhookDeliveries(new Date(minutesAgo(60)));
+
+    expect(deliveries).toEqual([
+      expect.objectContaining({ id: 3, guid: 'g-3', statusCode: 202, event: 'pull_request' }),
+      expect.objectContaining({ id: 2, guid: 'g-2', statusCode: 0 }),
+    ]);
+  });
+
+  it('reads at most MAX_DELIVERY_PAGES pages, however long the window', async () => {
+    for (let index = 0; index < 250; index += 1) {
+      fake.webhookDeliveries.push({
+        id: 1000 - index,
+        guid: `g-${String(index)}`,
+        delivered_at: minutesAgo(index),
+        status_code: 202,
+        event: 'push',
+      });
+    }
+
+    const deliveries = await app.listWebhookDeliveries(new Date(minutesAgo(10_000)));
+
+    expect(deliveries).toHaveLength(200);
+  });
+
+  it('asks GitHub to redeliver one delivery', async () => {
+    await app.redeliverWebhook(42);
+
+    expect(fake.redeliveredIds).toEqual([42]);
+  });
+});
+
+describe('getPullRequest (boot reconciliation, ADR-038)', () => {
+  it('returns the live head, base and draft state', async () => {
+    fake.pullStates.set('octo-demo/payments-api#7', {
+      state: 'open',
+      headSha: 'b'.repeat(40),
+      baseSha: 'c'.repeat(40),
+      isDraft: true,
+      title: 'Fix refund rounding',
+      authorLogin: 'rohan-mehta',
+      baseRef: 'main',
+      headRef: 'fix-refund-rounding',
+      updatedAt: '2026-10-08T09:30:00Z',
+    });
+
+    await expect(client.getPullRequest({ ...repo, pullNumber: 7 })).resolves.toEqual({
+      number: 7,
+      state: 'open',
+      headSha: 'b'.repeat(40),
+      baseSha: 'c'.repeat(40),
+      isDraft: true,
+      title: 'Fix refund rounding',
+      authorLogin: 'rohan-mehta',
+      baseRef: 'main',
+      headRef: 'fix-refund-rounding',
+      updatedAt: new Date('2026-10-08T09:30:00Z'),
+    });
+  });
+});

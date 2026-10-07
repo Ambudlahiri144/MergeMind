@@ -65,7 +65,11 @@ export const WorkerEnvSchema = z
       .default(DEFAULT_CHUNK_TOKENS),
     LLM_PASS_CONCURRENCY: ConcurrencySchema(DEFAULT_PASS_CONCURRENCY, MAX_PASS_CONCURRENCY),
 
-    // Code index (PRD F6, ADR-024): local Ollama embeddings, capped per repo.
+    // Code index (PRD F6, ADR-024): local Ollama embeddings, capped per repo. Off on hosts with
+    // no room for Ollama (ADR-038): index jobs are then skipped, and reviews run without context.
+    INDEX_ENABLED: BooleanFlagSchema.default(true),
+    // Ephemeral hosts lose the Redis queue on restart: re-enqueue reviews still owed (ADR-038).
+    RECONCILE_ON_BOOT: BooleanFlagSchema.default(false),
     EMBEDDING_MODEL: z.string().min(1).default('nomic-embed-text'),
     INDEX_MAX_FILES: z.coerce
       .number()

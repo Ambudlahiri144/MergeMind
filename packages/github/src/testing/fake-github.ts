@@ -109,11 +109,34 @@ export type FakeGithub = {
   /** `owner/repo:sha` → PRs whose commits include it. */
   commitPulls: Map<string, { number: number; state: 'open' | 'closed'; headSha: string }[]>;
   /** `owner/repo#number` → PR state; a missing key answers 404. */
-  pullStates: Map<string, { state: 'open' | 'closed'; headSha: string }>;
+  pullStates: Map<
+    string,
+    {
+      state: 'open' | 'closed';
+      headSha: string;
+      baseSha?: string;
+      isDraft?: boolean;
+      title?: string;
+      authorLogin?: string;
+      baseRef?: string;
+      headRef?: string;
+      updatedAt?: string;
+    }
+  >;
   /** PR conversation comments (issue comments), with how often each was edited. */
   issueComments: FakeIssueComment[];
   /** `org:username` -> membership; a missing key answers 404 (not a member). */
   orgMemberships: Map<string, { role: 'admin' | 'member'; state: 'active' | 'pending' }>;
+  /** App webhook deliveries, newest first, as `GET /app/hook/deliveries` returns them. */
+  webhookDeliveries: {
+    id: number;
+    guid: string;
+    delivered_at: string;
+    status_code: number;
+    event: string;
+  }[];
+  /** Delivery ids passed to `POST /app/hook/deliveries/:id/attempts`. */
+  redeliveredIds: number[];
   /** Make the next `times` requests matching method + path regex fail with `status`. */
   failNext(method: string, pattern: RegExp, status: number, times?: number): void;
   reset(): void;
@@ -146,6 +169,8 @@ export function createFakeGithub(): FakeGithub {
     pullStates: new Map(),
     issueComments: [],
     orgMemberships: new Map(),
+    webhookDeliveries: [],
+    redeliveredIds: [],
     failNext(method, pattern, status, times = 1) {
       faults.push({ method, pattern, status, remaining: times });
     },
@@ -171,6 +196,8 @@ export function createFakeGithub(): FakeGithub {
       fake.pullStates.clear();
       fake.issueComments.length = 0;
       fake.orgMemberships.clear();
+      fake.webhookDeliveries.length = 0;
+      fake.redeliveredIds.length = 0;
       faults.length = 0;
     },
   };
@@ -206,6 +233,34 @@ export function createFakeGithub(): FakeGithub {
         },
         { status: 201 },
       );
+    }),
+
+    // Cursor pagination like GitHub's: `cursor` is the index of the next page's first item.
+    http.get(`${API}/app/hook/deliveries`, ({ request }) => {
+      const url = new URL(request.url);
+      const perPage = Number(url.searchParams.get('per_page') ?? 30);
+      const start = Number(url.searchParams.get('cursor') ?? 0);
+      const page = fake.webhookDeliveries.slice(start, start + perPage).map((delivery) => ({
+        ...delivery,
+        action: null,
+        redelivery: false,
+        duration: 0.1,
+        status: delivery.status_code === 0 ? 'timed out' : String(delivery.status_code),
+        installation_id: null,
+        repository_id: null,
+      }));
+      const next = start + perPage;
+      const headers: Record<string, string> = {};
+      if (next < fake.webhookDeliveries.length) {
+        url.searchParams.set('cursor', String(next));
+        headers.link = `<${url.toString()}>; rel="next"`;
+      }
+      return HttpResponse.json(page, { headers });
+    }),
+
+    http.post(`${API}/app/hook/deliveries/:id/attempts`, ({ params }) => {
+      fake.redeliveredIds.push(Number(params.id));
+      return HttpResponse.json({}, { status: 202 });
     }),
 
     http.get(`${API}/app/installations/:id`, ({ params }) => {
@@ -487,7 +542,12 @@ export function createFakeGithub(): FakeGithub {
         : HttpResponse.json({
             number: Number(params.number),
             state: state.state,
-            head: { sha: state.headSha },
+            draft: state.isDraft ?? false,
+            title: state.title ?? 'Fake pull request',
+            user: { login: state.authorLogin ?? 'rohan-mehta' },
+            updated_at: state.updatedAt ?? '2026-10-08T10:00:00Z',
+            head: { sha: state.headSha, ref: state.headRef ?? 'feature' },
+            base: { sha: state.baseSha ?? '0'.repeat(40), ref: state.baseRef ?? 'main' },
           });
     }),
 

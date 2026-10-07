@@ -32,3 +32,9 @@ export const API_JWT_ISSUER = 'mergemind-web';
 export const API_JWT_AUDIENCE = 'mergemind-api';
 export const API_JWT_TTL_SECONDS = 300;
 export const MIN_API_JWT_SECRET_LENGTH = 32;
+
+/**
+ * Boot recovery on hosts that sleep or restart (ADR-038) waits this long: during a deploy the
+ * old instance keeps serving until the new one passes its health check.
+ */
+export const BOOT_RECOVERY_DELAY_MS = 60_000;

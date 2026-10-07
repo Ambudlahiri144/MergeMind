@@ -25,7 +25,12 @@ import {
   type LlmTracer,
   type StructuredCaller,
 } from '@mergemind/llm';
-import { QUEUE_NAMES, registerGracefulShutdown, type ShutdownStep } from '@mergemind/shared';
+import {
+  BOOT_RECOVERY_DELAY_MS,
+  QUEUE_NAMES,
+  registerGracefulShutdown,
+  type ShutdownStep,
+} from '@mergemind/shared';
 import { createLogger, type Logger } from '@mergemind/shared/logger';
 import { Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
@@ -34,9 +39,14 @@ import { loadWorkerEnv, type WorkerEnv } from './config/env.js';
 import { smokeTestGrammars } from './indexing/chunker/tree-sitter.js';
 import { DEFAULT_PIPELINE_CONFIG, type ReviewDeps } from './pipeline/types.js';
 import { createCiSummaryProcessor } from './processors/ci-summary.processor.js';
-import { createIndexProcessor } from './processors/index.processor.js';
+import {
+  createDisabledIndexProcessor,
+  createIndexProcessor,
+} from './processors/index.processor.js';
 import { createReviewProcessor } from './processors/review.processor.js';
 import { createWorkerRedisConnection } from './queues/connection.js';
+import { createReviewEnqueuer } from './queues/review-enqueuer.js';
+import { reconcileReviews } from './recovery/reconcile-reviews.js';
 
 const env = loadWorkerEnv();
 const logger = createLogger({ name: 'worker', level: env.LOG_LEVEL });
@@ -140,6 +150,13 @@ function startReviewWorker(connection: Redis, shared: SharedServices): Worker {
  * load; a missing vector index only disables retrieval, not indexing (ADR-024).
  */
 async function startIndexWorker(connection: Redis, shared: SharedServices): Promise<Worker | null> {
+  if (!env.INDEX_ENABLED) {
+    logger.info({ reason: 'INDEX_ENABLED=false' }, 'index.disabled');
+    return new Worker(QUEUE_NAMES.index, createDisabledIndexProcessor(), {
+      connection,
+      concurrency: 1,
+    });
+  }
   try {
     await smokeTestGrammars();
   } catch (error) {
@@ -195,6 +212,26 @@ function startCiSummaryWorker(connection: Redis, shared: SharedServices): Worker
   return worker;
 }
 
+/** Boot reconciliation (ADR-038): after the deploy settles, re-enqueue reviews still owed. */
+function scheduleReconcile(connection: Redis, github: GithubApp) {
+  const enqueuer = createReviewEnqueuer(connection);
+  setTimeout(() => {
+    reconcileReviews({
+      pullRequests: createPullRequestsRepository(),
+      reviewRuns: createReviewRunsRepository(),
+      repositories: createRepositoriesRepository(),
+      installations: createInstallationsRepository(),
+      github,
+      enqueue: (data) => enqueuer.enqueue(data),
+      logger,
+      now: () => new Date(),
+    }).catch((error: unknown) => {
+      logger.error({ err: error }, 'reconcile.passFailed');
+    });
+  }, BOOT_RECOVERY_DELAY_MS).unref();
+  return enqueuer;
+}
+
 async function main(): Promise<void> {
   await connectMongo(env.MONGODB_URI);
   await ensureDbIndexes();
@@ -205,6 +242,7 @@ async function main(): Promise<void> {
   await connection.ping();
 
   const workers: { name: string; worker: Worker }[] = [];
+  let reviewEnqueuer: ReturnType<typeof createReviewEnqueuer> | null = null;
   if (env.GITHUB_APP_ID === undefined || env.GITHUB_APP_PRIVATE_KEY === undefined) {
     // Jobs wait in Redis until the App is configured; nothing is lost.
     logger.warn({ reason: 'github_app_not_configured' }, 'review.disabled');
@@ -224,6 +262,9 @@ async function main(): Promise<void> {
     if (indexWorker !== null) {
       workers.push({ name: 'index-worker', worker: indexWorker });
     }
+    if (env.RECONCILE_ON_BOOT) {
+      reviewEnqueuer = scheduleReconcile(connection, shared.github);
+    }
   }
   logger.info(
     {
@@ -242,6 +283,10 @@ async function main(): Promise<void> {
     name,
     run: () => worker.close(),
   }));
+  if (reviewEnqueuer !== null) {
+    const enqueuer = reviewEnqueuer;
+    steps.push({ name: 'reconcile-queue', run: () => enqueuer.close() });
+  }
   // After the worker: in-flight reviews may still record spans while closing.
   steps.push({ name: 'llm-tracer', run: () => tracer.shutdown() });
   steps.push(

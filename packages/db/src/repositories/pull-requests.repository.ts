@@ -42,6 +42,8 @@ export type PullRequestsRepository = {
   ): Promise<PullRequestView[]>;
   /** Open PR count per repository id (repository list). */
   countOpenByRepository(repositoryIds: readonly string[]): Promise<Map<string, number>>;
+  /** Open PRs across repositories updated on GitHub since `since`, newest first (ADR-038). */
+  listOpenUpdatedSince(since: Date, limit: number): Promise<PullRequestView[]>;
 };
 
 const VIEW_PROJECTION = {
@@ -116,6 +118,17 @@ export function createPullRequestsRepository(): PullRequestsRepository {
         VIEW_PROJECTION,
       ).lean<LeanPullRequest>();
       return doc ? toView(doc) : null;
+    },
+
+    async listOpenUpdatedSince(since, limit) {
+      const docs = await PullRequestModel.find(
+        { state: 'open', githubUpdatedAt: { $gte: since } },
+        VIEW_PROJECTION,
+      )
+        .sort({ githubUpdatedAt: -1 })
+        .limit(limit)
+        .lean<LeanPullRequest[]>();
+      return docs.map(toView);
     },
 
     async listForRepository(repositoryId, { state, limit, before }) {

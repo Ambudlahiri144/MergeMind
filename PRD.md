@@ -118,6 +118,7 @@ When CI fails, engineers scroll through thousands of log lines to find the one t
 | **Privacy** | Private code must not go to providers that train on it | For private repos, an org-level `allowedProviders` list. Gemini free tier is excluded unless the org opts in. |
 | **Secrets** | App private key, webhook secret, API keys | Env vars only, never logged. Validated at boot with Zod. |
 | **Runtime** | Node 22 LTS (Node 20 reached end of life in April 2026) | `.nvmrc` and the `engines` field |
+| **Ephemeral free hosting** | The free backend host sleeps when idle and keeps nothing on disk. Its Redis queue is emptied on every restart, and GitHub never retries a webhook that timed out. | **No review is lost to a restart or a sleep.** About a minute after boot, failed App webhooks of the last 24 h are redelivered, and open PRs whose head has no finished review are re-enqueued with the same deterministic job id. A keep-alive ping avoids most sleeps (ADR-038). Acceptance: the redelivery-selection unit tests and the reconcile integration test. |
 
 ---
 

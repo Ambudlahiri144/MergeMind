@@ -32,5 +32,6 @@ apps/web/CLAUDE.md
 # not needed by the api or worker
 apps/web/public
 apps/web/e2e
-deploy
+deploy/*
+!deploy/render
 *.log

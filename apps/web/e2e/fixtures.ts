@@ -40,8 +40,9 @@ export async function expectAccessible(page: Page): Promise<void> {
   );
   expect(
     blocking.map(
+      // The element's opening tag is included so a CI-only failure is diagnosable from the log.
       (violation) =>
-        `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`,
+        `${violation.id}: ${violation.nodes.map((node) => `${node.target.join(' ')} ${node.html.slice(0, 200)}`).join(', ')}`,
     ),
   ).toEqual([]);
 }

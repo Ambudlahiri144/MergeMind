@@ -88,7 +88,7 @@ Precision counts critical and major reports; recall counts seeded critical and m
 
 ## Deploy
 
-The backend (api, worker, Redis, Ollama, Caddy for HTTPS) runs on one free VM with Docker Compose, and the web app on Vercel. [Deploy.md](Deploy.md) walks through it: the VM, `deploy/deploy.sh`, the Vercel settings and pointing the GitHub App at production.
+MergeMind deploys for free with no credit card. The backend (api, worker and Redis in one container) runs on a Render free web service from `render.yaml`, and the web app runs on Vercel. A free cron ping keeps the backend awake, and on every restart MergeMind redelivers missed webhooks and re-enqueues reviews still owed, so no review is lost. [Deploy.md](Deploy.md) has the steps, plus a Docker Compose setup for a VM of your own (with local embeddings).
 
 ## Development
 

@@ -1,4 +1,5 @@
 import {
+  BooleanFlagSchema,
   LogLevelSchema,
   MIN_API_JWT_SECRET_LENGTH,
   MongoUriSchema,
@@ -24,6 +25,8 @@ export const ApiEnvSchema = z
     GITHUB_WEBHOOK_SECRET: z.string().min(MIN_WEBHOOK_SECRET_LENGTH),
     // web -> api tokens (ADR-029); without it the authenticated routes answer 503.
     API_JWT_SECRET: z.string().min(MIN_API_JWT_SECRET_LENGTH).optional(),
+    // Hosts that sleep or restart (ADR-038): resend App webhooks that never got a 2xx.
+    WEBHOOK_REDELIVERY_ON_BOOT: BooleanFlagSchema.default(false),
     API_RATE_LIMIT_PER_MINUTE: z.coerce
       .number()
       .int()

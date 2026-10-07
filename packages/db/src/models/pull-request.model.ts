@@ -41,5 +41,7 @@ pullRequestSchema.index({ repositoryId: 1, number: 1 }, { unique: true });
 pullRequestSchema.index({ repositoryId: 1, state: 1, updatedAt: -1 });
 // All PRs of a repository, newest first (the web's state=all list).
 pullRequestSchema.index({ repositoryId: 1, updatedAt: -1 });
+// Boot reconciliation on ephemeral hosts (ADR-038): open PRs by last GitHub update.
+pullRequestSchema.index({ state: 1, githubUpdatedAt: -1 });
 
 export const PullRequestModel = defineModel('PullRequest', pullRequestSchema);
