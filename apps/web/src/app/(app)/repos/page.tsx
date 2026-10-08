@@ -16,7 +16,7 @@ import { ActionForm } from '@/components/action-form';
 import { ErrorPanel } from '@/components/error-panel';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState, PageHeader } from '@/components/ui/states';
-import { installUrl } from '@/lib/env';
+import { installUrl, isIndexEnabled } from '@/lib/env';
 import { timeAgo } from '@/lib/format';
 import { load } from '@/lib/load';
 import { requireViewer } from '@/lib/session';
@@ -32,7 +32,15 @@ const INDEX_LABEL: Record<RepositoryItem['indexStatus'], string> = {
 
 type Installation = MeResponse['installations'][number];
 
-function RepositoryRow({ repo, canAdmin }: { repo: RepositoryItem; canAdmin: boolean }) {
+function RepositoryRow({
+  repo,
+  canAdmin,
+  isIndexEnabled,
+}: {
+  repo: RepositoryItem;
+  canAdmin: boolean;
+  isIndexEnabled: boolean;
+}) {
   return (
     <li className="grid grid-cols-[minmax(0,1fr)] gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_9rem_6rem_7rem_minmax(0,13rem)] md:items-center md:gap-4">
       <div className="min-w-0">
@@ -53,19 +61,26 @@ function RepositoryRow({ repo, canAdmin }: { repo: RepositoryItem; canAdmin: boo
           {repo.isEnabled ? null : <span>· Reviews off</span>}
         </p>
       </div>
-      <p className="text-text-muted">
-        <span className="md:hidden">Last review: </span>
-        {repo.lastReviewAt ? (
-          <time dateTime={repo.lastReviewAt}>{timeAgo(repo.lastReviewAt)}</time>
-        ) : (
-          'Never'
-        )}
-      </p>
-      <p>
-        <span className="font-mono text-[13px]">{repo.openPullRequests}</span>
-        <span className="text-text-muted"> open</span>
-      </p>
-      <p className="text-text-muted">{INDEX_LABEL[repo.indexStatus]}</p>
+      {/* Phones: one labelled line. md and up: the wrapper dissolves into the table columns. */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm md:contents md:text-[15px]">
+        <p className="text-text-muted">
+          <span className="md:hidden">Last review </span>
+          {repo.lastReviewAt ? (
+            <time dateTime={repo.lastReviewAt}>{timeAgo(repo.lastReviewAt)}</time>
+          ) : (
+            'never'
+          )}
+        </p>
+        <p>
+          <span className="font-mono text-[13px]">{repo.openPullRequests}</span>
+          <span className="text-text-muted">
+            {' '}
+            open
+            <span className="md:hidden"> {repo.openPullRequests === 1 ? 'PR' : 'PRs'}</span>
+          </span>
+        </p>
+        <p className="text-text-muted">{INDEX_LABEL[repo.indexStatus]}</p>
+      </div>
       <div className="flex flex-wrap gap-2 md:justify-end">
         {canAdmin ? (
           <ActionForm
@@ -73,16 +88,14 @@ function RepositoryRow({ repo, canAdmin }: { repo: RepositoryItem; canAdmin: boo
             fields={{ repositoryId: repo.id, isEnabled: String(!repo.isEnabled) }}
             label={repo.isEnabled ? 'Turn off' : 'Turn on'}
             pendingLabel="Saving"
-            variant="ghost"
           />
         ) : null}
-        {repo.isEnabled ? (
+        {repo.isEnabled && isIndexEnabled ? (
           <ActionForm
             action={reindexRepository}
             fields={{ repositoryId: repo.id }}
             label="Reindex"
             pendingLabel="Queuing"
-            variant="ghost"
           />
         ) : null}
       </div>
@@ -123,7 +136,12 @@ function InstallationSection({
           </div>
           <ul className="divide-y-2 divide-border">
             {repos.map((repo) => (
-              <RepositoryRow key={repo.id} repo={repo} canAdmin={canAdmin} />
+              <RepositoryRow
+                key={repo.id}
+                repo={repo}
+                canAdmin={canAdmin}
+                isIndexEnabled={isIndexEnabled()}
+              />
             ))}
           </ul>
         </div>

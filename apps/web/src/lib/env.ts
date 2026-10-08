@@ -16,6 +16,8 @@ const WebEnvSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
   /** The App's public slug, for "Install on GitHub" links. */
   GITHUB_APP_SLUG: z.string().min(1).default('mergemind-review'),
+  /** Mirrors the worker's INDEX_ENABLED (ADR-038): `false` hides Reindex, which would do nothing. */
+  INDEX_ENABLED: z.enum(['true', 'false']).default('true'),
   /** E2E sign-in seam (ADR-029); honoured only outside production. */
   MERGEMIND_E2E: z.enum(['0', '1']).default('0'),
 });
@@ -31,6 +33,10 @@ export function webEnv(): WebEnv {
 
 export function isE2eMode(env: WebEnv = webEnv()): boolean {
   return env.MERGEMIND_E2E === '1' && env.NODE_ENV !== 'production';
+}
+
+export function isIndexEnabled(env: WebEnv = webEnv()): boolean {
+  return env.INDEX_ENABLED === 'true';
 }
 
 export function installUrl(env: WebEnv = webEnv()): string {

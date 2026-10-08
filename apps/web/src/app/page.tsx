@@ -2,6 +2,7 @@ import {
   ArrowSquareOutIcon as ArrowSquareOut,
   BugBeetleIcon as BugBeetle,
   GitPullRequestIcon as GitPullRequest,
+  ListIcon as List,
   ListChecksIcon as ListChecks,
   ShieldWarningIcon as ShieldWarning,
   WrenchIcon as Wrench,
@@ -41,6 +42,11 @@ const REPO_URL = 'https://github.com/Ambudlahiri144/MergeMind';
 const SAMPLE_REVIEW_URL = 'https://github.com/Ambudlahiri144/dev_portfolio/pull/2';
 
 const CONTAINER = 'mx-auto max-w-6xl px-4 md:px-6';
+const SECTION_LINKS = [
+  ['How it works', '#how'],
+  ['What it checks', '#checks'],
+  ['GitHub', REPO_URL],
+] as const;
 const SECTION_TITLE = 'text-4xl leading-[1.05] font-bold tracking-[-0.03em] md:text-5xl';
 const CARD = 'min-w-0 rounded-base border-2 border-border p-6 shadow-hard';
 
@@ -99,11 +105,7 @@ function Nav({ isSignedIn }: { isSignedIn: boolean }) {
         </Link>
         <nav aria-label="Sections" className="hidden md:block">
           <ul className="flex items-center gap-1 font-bold text-text-muted">
-            {[
-              ['How it works', '#how'],
-              ['What it checks', '#checks'],
-              ['GitHub', REPO_URL],
-            ].map(([label, href]) => (
+            {SECTION_LINKS.map(([label, href]) => (
               <li key={label}>
                 <a
                   href={href}
@@ -115,19 +117,57 @@ function Nav({ isSignedIn }: { isSignedIn: boolean }) {
             ))}
           </ul>
         </nav>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
           <Link
             href={isSignedIn ? '/repos' : '/signin'}
-            className={cn(
-              buttonVariants({ variant: 'ghost', size: 'touch' }),
-              'hidden sm:inline-flex',
-            )}
+            className={buttonVariants({ variant: 'ghost', size: 'touch' })}
           >
             {isSignedIn ? 'Open the app' : 'Sign in'}
           </Link>
-          <a href={installUrl()} className={buttonVariants({ variant: 'primary', size: 'touch' })}>
+          <a
+            href={installUrl()}
+            className={cn(
+              buttonVariants({ variant: 'primary', size: 'touch' }),
+              'hidden sm:inline-flex',
+            )}
+          >
             Install on GitHub
           </a>
+          {/* Below md the section links (and, on phones, Install) move into a disclosure menu. */}
+          <details className="relative md:hidden">
+            <summary
+              aria-label="Menu"
+              className="inline-flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-base border-2 border-border bg-surface hover:bg-surface-muted [&::-webkit-details-marker]:hidden"
+            >
+              <List size={20} weight="bold" aria-hidden="true" />
+            </summary>
+            <nav
+              aria-label="Site"
+              className="absolute right-0 mt-2 w-60 rounded-base border-2 border-border bg-surface p-2 shadow-hard"
+              style={{ zIndex: Z_INDEX.popover }}
+            >
+              <ul className="flex flex-col gap-1 font-bold">
+                {SECTION_LINKS.map(([label, href]) => (
+                  <li key={label}>
+                    <a
+                      href={href}
+                      className="flex h-10 items-center rounded-base border-2 border-transparent px-3 hover:border-border hover:bg-surface-muted"
+                    >
+                      {label}
+                    </a>
+                  </li>
+                ))}
+                <li className="mt-1 sm:hidden">
+                  <a
+                    href={installUrl()}
+                    className={cn(buttonVariants({ variant: 'primary', size: 'touch' }), 'w-full')}
+                  >
+                    Install on GitHub
+                  </a>
+                </li>
+              </ul>
+            </nav>
+          </details>
         </div>
       </div>
     </header>
@@ -186,7 +226,8 @@ export default async function LandingPage() {
                   theme={theme}
                   light={heroLight}
                   dark={heroDark}
-                  alt="MergeMind run page: a critical finding for a payment key committed in src/refunds.ts, with the flagged line highlighted in the code panel."
+                  narrow={{ light: findingLight, dark: findingDark }}
+                  alt="MergeMind run page: a critical finding for a payment key committed in src/refunds.ts, with a suggested fix and the flagged line."
                   sizes="(min-width: 1024px) 640px, 100vw"
                   isPriority
                 />

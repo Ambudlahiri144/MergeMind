@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { installUrl, isE2eMode, type WebEnv } from './env';
+import { installUrl, isE2eMode, isIndexEnabled, type WebEnv } from './env';
 
 const BASE: WebEnv = {
   NODE_ENV: 'development',
   API_BASE_URL: 'http://localhost:4000',
   BETTER_AUTH_URL: 'http://localhost:3000',
   GITHUB_APP_SLUG: 'mergemind-review',
+  INDEX_ENABLED: 'true',
   MERGEMIND_E2E: '0',
 };
 
@@ -21,5 +22,12 @@ describe('the E2E sign-in seam (ADR-029)', () => {
 describe('installUrl', () => {
   it('points at the App installation page', () => {
     expect(installUrl(BASE)).toBe('https://github.com/apps/mergemind-review/installations/new');
+  });
+});
+
+describe('isIndexEnabled (ADR-038)', () => {
+  it('is on by default and off when the host has no code index', () => {
+    expect(isIndexEnabled(BASE)).toBe(true);
+    expect(isIndexEnabled({ ...BASE, INDEX_ENABLED: 'false' })).toBe(false);
   });
 });

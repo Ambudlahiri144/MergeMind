@@ -44,11 +44,16 @@ export function ActionForm({
           {isPending ? pendingLabel : label}
         </Button>
       </div>
+      {/* Always rendered, so screen readers announce the result; it takes no space while empty. */}
       <p
         aria-live="polite"
         className={cn(
-          'min-h-5 text-xs font-medium',
-          result.status === 'error' ? 'text-sev-critical' : 'text-text-muted',
+          result.message === ''
+            ? 'sr-only'
+            : cn(
+                'text-xs font-medium',
+                result.status === 'error' ? 'text-sev-critical' : 'text-text-muted',
+              ),
         )}
       >
         {result.message}

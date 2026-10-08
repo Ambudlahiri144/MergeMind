@@ -153,6 +153,36 @@ test('the landing page is accessible and fits a phone', async ({ page }) => {
     () => document.documentElement.scrollWidth - window.innerWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
+  // Phones keep a way in: Sign in in the bar, sections and Install behind the menu.
+  await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
+  await page.getByLabel('Menu').click();
+  await expect(page.getByRole('navigation', { name: 'Site' })).toContainText('What it checks');
+  await expect(
+    page.getByRole('navigation', { name: 'Site' }).getByRole('link', { name: 'Install on GitHub' }),
+  ).toBeVisible();
+  await page.getByLabel('Menu').click();
   await page.emulateMedia({ colorScheme: 'dark' });
   await expectAccessible(page);
+});
+
+test('after installing the App, GitHub lands people on /setup (signed out: sign in next)', async ({
+  page,
+}) => {
+  await page.goto('/setup?installation_id=1&setup_action=install');
+  await expect(page.getByRole('heading', { name: 'MergeMind is installed' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sign in to MergeMind' })).toHaveAttribute(
+    'href',
+    '/signin?next=%2Frepos',
+  );
+  await expectAccessible(page);
+
+  await page.goto('/setup?setup_action=request');
+  await expect(page.getByRole('heading', { name: 'Installation requested' })).toBeVisible();
+});
+
+test('a signed-in visitor goes straight from /setup to their repositories', async ({
+  signedIn: page,
+}) => {
+  await page.goto('/setup?installation_id=1&setup_action=install');
+  await expect(page.getByRole('heading', { name: 'Repositories', level: 1 })).toBeVisible();
 });

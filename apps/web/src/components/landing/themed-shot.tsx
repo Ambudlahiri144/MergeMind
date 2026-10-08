@@ -1,49 +1,73 @@
-import Image, { getImageProps, type StaticImageData } from 'next/image';
+import { getImageProps, type StaticImageData } from 'next/image';
 
 import { cn } from '@/lib/cn';
 import type { Theme } from '@/lib/theme';
 
+/** Phones get the `narrow` images when given (a crop that stays readable at ~350px). */
+const NARROW_MEDIA = '(max-width: 767px)';
+const DARK_MEDIA = '(prefers-color-scheme: dark)';
+
+type Pair = { light: StaticImageData; dark: StaticImageData };
+
 /**
- * A real screenshot in the page's theme. A pinned theme (cookie) gets that image; "system"
- * gets a <picture> that follows prefers-color-scheme, so only one image is downloaded.
+ * A real screenshot in the page's theme, as one art-directed <picture> (the Next.js image docs'
+ * getImageProps pattern), so the browser downloads exactly one file:
+ * - a pinned theme (cookie) uses that theme's images; "system" follows prefers-color-scheme;
+ * - with `narrow`, screens under 768px get the narrow crop instead.
  */
 export function ThemedShot({
   theme,
   light,
   dark,
+  narrow,
   alt,
   sizes,
+  narrowSizes = '100vw',
   isPriority = false,
   className,
-}: {
+}: Pair & {
   theme: Theme;
-  light: StaticImageData;
-  dark: StaticImageData;
+  narrow?: Pair;
   alt: string;
   sizes: string;
+  narrowSizes?: string;
   isPriority?: boolean;
   className?: string;
 }) {
-  const imageClass = cn('h-auto w-full', className);
-  if (theme !== 'system') {
-    return (
-      <Image
-        src={theme === 'dark' ? dark : light}
-        alt={alt}
-        sizes={sizes}
-        priority={isPriority}
-        className={imageClass}
-      />
-    );
+  const props = (src: StaticImageData, imageSizes: string) =>
+    getImageProps({ alt, src, sizes: imageSizes, priority: isPriority }).props;
+  const sources: { media: string; image: ReturnType<typeof props> }[] = [];
+  const add = (media: string, src: StaticImageData, imageSizes: string) => {
+    sources.push({ media, image: props(src, imageSizes) });
+  };
+
+  if (narrow) {
+    if (theme === 'system') {
+      add(`${NARROW_MEDIA} and ${DARK_MEDIA}`, narrow.dark, narrowSizes);
+      add(NARROW_MEDIA, narrow.light, narrowSizes);
+    } else {
+      add(NARROW_MEDIA, theme === 'dark' ? narrow.dark : narrow.light, narrowSizes);
+    }
   }
-  const common = { alt, sizes, priority: isPriority };
-  const { props: darkProps } = getImageProps({ ...common, src: dark });
-  const { props: lightProps } = getImageProps({ ...common, src: light });
+  if (theme === 'system') {
+    add(DARK_MEDIA, dark, sizes);
+  }
+  const fallback = props(theme === 'dark' ? dark : light, sizes);
+
   return (
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcSet={darkProps.srcSet} sizes={sizes} />
+      {sources.map(({ media, image }) => (
+        <source
+          key={media}
+          media={media}
+          srcSet={image.srcSet}
+          sizes={image.sizes}
+          width={image.width}
+          height={image.height}
+        />
+      ))}
       {/* Art-directed <picture> with getImageProps, as the Next.js image docs show. */}
-      <img {...lightProps} alt={alt} className={imageClass} />
+      <img {...fallback} alt={alt} className={cn('h-auto w-full', className)} />
     </picture>
   );
 }

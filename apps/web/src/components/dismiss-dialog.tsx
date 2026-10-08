@@ -25,9 +25,7 @@ export function DismissDialog({ findingId, title }: { findingId: string; title: 
 
   return (
     <>
-      <Button variant="ghost" onClick={() => dialog.current?.showModal()}>
-        Dismiss
-      </Button>
+      <Button onClick={() => dialog.current?.showModal()}>Dismiss</Button>
       <p aria-live="polite" className="sr-only">
         {result.status === 'ok' ? result.message : ''}
       </p>

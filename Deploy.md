@@ -89,6 +89,7 @@ On cron-job.org: **Create cronjob**, URL `https://<your-service>.onrender.com/ap
    | `BETTER_AUTH_URL` | the production URL, e.g. `https://mergemind.vercel.app` |
    | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | the App's OAuth credentials |
    | `GITHUB_APP_SLUG` | the App's slug, e.g. `mergemind-review` |
+   | `INDEX_ENABLED` | `false`, to match the backend (hides the Reindex button, which would do nothing without a code index) |
 
    Leave them unset for Preview deployments: previews show the landing page but cannot sign in.
 3. **Deploy.**
@@ -100,6 +101,7 @@ In the App's settings (GitHub → Settings → Developer settings → GitHub App
 - **Webhook URL:** `https://<your-service>.onrender.com/webhooks/github`. The secret stays the same.
 - **Callback URL:** add `https://<your-vercel-url>/api/auth/callback/github`, and keep the localhost one for development.
 - **Homepage URL:** the Vercel URL.
+- **Post installation → Setup URL:** `https://<your-vercel-url>/setup`, and tick **Redirect on update**. After someone installs the App (or changes its repositories), GitHub sends them back to MergeMind: signed-in users land on their repositories; everyone else sees "MergeMind is installed" with a sign-in button. Leave **Request user authorization (OAuth) during installation** unticked: sign-in has its own flow.
 
 Then open a pull request on an installed repository: within a couple of minutes it gets a review and a `mergemind/review` check. **Advanced → Recent deliveries** in the App's settings shows the deliveries answered with 202.
 

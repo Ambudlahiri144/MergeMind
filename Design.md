@@ -146,7 +146,8 @@ Black ink and off-white, plus one main colour (**lemon**) and three flat seconda
 | Route | Screen | Purpose |
 |---|---|---|
 | `/` | Landing | Explain and convert: install the GitHub App |
-| `/signin` | Sign in | "Continue with GitHub" in a bordered card on `shadow-hard-lg` |
+| `/signin` | Sign in | "Continue with GitHub" in a bordered card on `shadow-hard-lg`, with a link home and "Install on GitHub" for visitors without an installation |
+| `/setup` | Installed | The GitHub App's Setup URL: signed-in users go to `/repos`; others see "MergeMind is installed" and sign in (`setup_action=request`: "Installation requested") |
 | `/repos` | Repositories | Enabled repos, last review, toggle, reindex |
 | `/repos/[repoId]` | Repository | Open PRs with latest run status, effective policy |
 | `/repos/[repoId]/pulls/[number]` | Pull request | Gate banner, rerun, run timeline |
@@ -159,7 +160,8 @@ Black ink and off-white, plus one main colour (**lemon**) and three flat seconda
 
 | Section | Treatment | Content |
 |---|---|---|
-| **Hero** | Lemon band (`scope-fill`). Copy left, real screenshot right in a 3px frame on `shadow-hard-lg`, a rotated "with sample data" sticker as the caption. | Headline ≤ 2 lines ("Code review that never sleeps."), subtext ≤ 20 words, CTAs **"Install on GitHub"** (ink) and "See a sample review" (secondary). No eyebrow, no logo strip. |
+| **Nav** | Wordmark, section links (`md`+), "Sign in" / "Open the app" always visible, "Install on GitHub" (`sm`+). Below `md` a bordered disclosure menu holds the section links, and on phones also "Install on GitHub". |
+| **Hero** | Lemon band (`scope-fill`). Copy left, real screenshot right in a 3px frame on `shadow-hard-lg`, a rotated "with sample data" sticker as the caption. Phones get the readable finding-card crop instead of the wide run-page crop (one art-directed `<picture>`, one download). | Headline ≤ 2 lines ("Code review that never sleeps."), subtext ≤ 20 words, CTAs **"Install on GitHub"** (ink) and "See a sample review" (secondary). No eyebrow, no logo strip. |
 | **How a review runs** | Title with a lemon marker word; 3 bordered cards with a lemon icon tile and a large mono numeral (`01`-`03`); the real GitHub review screenshot, framed. | Verb-noun steps: "Open a PR", "Get findings", "Merge with confidence". |
 | **What it checks** | Bento, **exactly 4 cells**, each a different flat fill: security (white, with the finding screenshot), correctness (cyan), maintainability (lavender), CI failures (lemon, with a real CI comment excerpt). | One sentence each. |
 | **Runs on free tiers** | Ink terminal window (`scope-ink`) with a "Terminal" title bar. | The `docker compose up` + `ollama pull` commands. |

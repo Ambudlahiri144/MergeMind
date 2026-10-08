@@ -4,12 +4,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { auth } from '@/lib/auth';
-
-/** Only same-site paths are followed after sign-in (no open redirect). */
-function safeNext(value: FormDataEntryValue | null): string {
-  const next = typeof value === 'string' ? value : '';
-  return next.startsWith('/') && !next.startsWith('//') ? next : '/repos';
-}
+import { safeNext } from '@/lib/safe-next';
 
 export async function signInWithGithub(formData: FormData): Promise<void> {
   const result = await auth.api.signInSocial({

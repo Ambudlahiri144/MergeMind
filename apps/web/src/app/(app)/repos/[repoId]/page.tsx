@@ -132,7 +132,7 @@ export default async function RepositoryPage(props: PageProps<'/repos/[repoId]'>
     <>
       <PageHeader
         title={repo.data.fullName}
-        meta={`${String(repo.data.openPullRequests)} open pull requests · reviews ${repo.data.isEnabled ? 'on' : 'off'}`}
+        meta={`${String(repo.data.openPullRequests)} open pull ${repo.data.openPullRequests === 1 ? 'request' : 'requests'} · reviews ${repo.data.isEnabled ? 'on' : 'off'}`}
       />
       <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <section aria-labelledby="pulls-heading">

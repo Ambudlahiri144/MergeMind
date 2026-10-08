@@ -20,7 +20,7 @@ import {
 } from '@mergemind/db';
 import { createGithubApp } from '@mergemind/github';
 import { createFakeGithub, createTestPrivateKey } from '@mergemind/github/testing';
-import { usagePeriod } from '@mergemind/shared';
+import { LogLevelSchema, usagePeriod } from '@mergemind/shared';
 import { createLogger } from '@mergemind/shared/logger';
 import { Redis } from 'ioredis';
 import { setupServer } from 'msw/node';
@@ -44,7 +44,11 @@ import {
 } from './constants.js';
 
 const webDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const logger = createLogger({ name: 'e2e-api', level: 'fatal' });
+// Quiet by default; E2E_API_LOG_LEVEL=info shows the api's requests and errors when debugging.
+const logger = createLogger({
+  name: 'e2e-api',
+  level: LogLevelSchema.parse(process.env.E2E_API_LOG_LEVEL ?? 'fatal'),
+});
 const HEAD = 'c3d4e5f60718293a4b5c6d7e8f9012345678901a';
 
 /** The file the seeded findings point at, served by the fake GitHub for the snippet panel. */

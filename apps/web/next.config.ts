@@ -24,8 +24,15 @@ const nextConfig: NextConfig = {
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   reactStrictMode: true,
   poweredByHeader: false,
-  // No dev badge in E2E runs (it would show up in the landing-page screenshots).
-  ...(process.env.MERGEMIND_E2E === '1' ? { devIndicators: false as const } : {}),
+  // E2E runs: no dev badge (it would show up in the landing-page screenshots), and no persistent
+  // Turbopack dev cache. A warm `.next-e2e` cache produced one-off "module not found" and route
+  // 404s locally; starting cold every time also matches CI.
+  ...(process.env.MERGEMIND_E2E === '1'
+    ? {
+        devIndicators: false as const,
+        experimental: { turbopackFileSystemCacheForDev: false },
+      }
+    : {}),
   // Turbopack has no custom export conditions and cannot map shared's `.js` specifiers to
   // `.ts`, so the web reads `@mergemind/shared` from its dist. The web's predev, prebuild,
   // pretest:e2e and prescreenshots scripts rebuild it first (ADR-035).
